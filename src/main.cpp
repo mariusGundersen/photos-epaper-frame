@@ -3,6 +3,7 @@
 #include <WiFiManager.h>
 #include <HTTPClient.h>
 #include <JPEGDEC.h>
+#include "dither.h"
 
 // IO settings
 int BUSY_Pin = D5;
@@ -46,6 +47,7 @@ int SDI_Pin = D10;
 #define yellow 0x05 /// 101
 #define orange 0x06 /// 110
 #define clean 0x07  /// 111
+
 ////////FUNCTION//////
 void driver_delay_us(unsigned int xus);
 void driver_delay(unsigned long xms);
@@ -74,6 +76,19 @@ const char *imageUrl = "";
 
 JPEGDEC jpeg;
 unsigned char *epd_buffer;
+uint16_t *pixels;
+
+uint16_t palette[7] = {
+    0x0000, // rgb565(0b00000, 0b000000, 0b00000), // black
+    0xffff, // rgb565(0b11111, 0b111111, 0b11111), // white
+    0x3d8e, // rgb565(0b00000, 0x111111, 0x00000), // green
+    0x5a56, // rgb565(0b00000, 0x000000, 0x11111), // blue
+    0xc268, // rgb565(0b11111, 0x000000, 0x00000), // red
+    0xff87, // rgb565(0b11111, 0x111111, 0x00000), // yellow
+    0xf569, // rgb565(0b11111, 0x011111, 0x00000)  // orange
+};
+
+FloydSteinberg floydSteinberg(7, palette);
 
 int drawImg(JPEGDRAW *pDraw)
 {
@@ -84,11 +99,9 @@ int drawImg(JPEGDRAW *pDraw)
 
   for (int y = 0; y < h; y++)
   {
-    for (int x = 0; x < w; x += 2)
+    for (int x = 0; x < w; x++)
     {
-      int p1 = (pDraw->pPixels[y * w + x + 0] & 0x7e0) >> 5; // extract just the six green channel bits.
-      int p2 = (pDraw->pPixels[y * w + x + 1] & 0x7e0) >> 5; // extract just the six green channel bits.
-      epd_buffer[(yOffset + y) * 300 + (xOffset + x) / 2] = ((p1 > 0b100000 ? black : white) << 4) | (p2 > 0b100000 ? black : white);
+      pixels[(yOffset + y) * 600 + (xOffset + x)] = pDraw->pPixels[y * w + x];
     }
   }
   return 1;
@@ -132,6 +145,7 @@ void setup()
   Serial.printf("Size: %d\n", size);
   WiFiClient *stream = http.getStreamPtr();
   uint8_t *buffer = (uint8_t *)malloc(size * sizeof(uint8_t));
+  pixels = (uint16_t *)malloc(600 * 448 * sizeof(uint16_t));
   uint8_t *write = buffer;
   Serial.printf("streaming %d", stream->available());
   while (http.connected() && stream->available())
@@ -141,12 +155,6 @@ void setup()
   }
   Serial.println("downloaded image");
 
-  for (int i = 0; i < 100; i++)
-  {
-    Serial.print(buffer[i], HEX);
-  }
-
-  epd_buffer = (unsigned char *)malloc(300 * 448 * sizeof(char));
   if (jpeg.openRAM(buffer, size, drawImg))
   {
     Serial.println("opened jpeg");
@@ -165,6 +173,20 @@ void setup()
     }
     jpeg.close();
     free(buffer);
+
+    epd_buffer = (unsigned char *)malloc(300 * 448 * sizeof(char));
+    floydSteinberg.dither(600, 448, pixels);
+
+    for (int y = 0; y < 448; y++)
+    {
+      for (int x = 0; x < 600; x += 2)
+      {
+        int p1 = pixels[y * 600 + x + 0];
+        int p2 = pixels[y * 600 + x + 1];
+        epd_buffer[y * 300 + x / 2] = (p1 << 4) | (p2 << 0);
+      }
+    }
+
     EPD_init();           // EPD init
     draw4bit(epd_buffer); // EPD_picture1
     EPD_sleep();          // EPD_sleep,Sleep instruction is necessary, please do not delete!!!
@@ -173,6 +195,35 @@ void setup()
   {
     Serial.printf("Failed to read jpeg %d", jpeg.getLastError());
   }
+
+  /*
+    EPD_init(); // EPD init
+
+    Acep_color(Clean); // Each refresh must be cleaned first
+    EPD_W21_WriteCMD(0x10);
+    for (int y = 0; y < 448; y++)
+    {
+      for (int x = 0; x < 300; x++)
+      {
+        uint8_t c = find_closest_palette_color(((x * 0b111111 / 300) << 5), 7, palette);
+        EPD_W21_WriteDATA((c << 4) | c);
+      }
+    }
+
+    // Refresh
+    EPD_W21_WriteCMD(0x12); // DISPLAY REFRESH
+    delay(1);               //!!!The delay here is necessary, 200uS at least!!!
+    lcd_chkstatus();        // waiting for the electronic paper IC to release the idle signal
+
+    EPD_sleep(); // EPD_sleep,Sleep instruction is necessary, please do not delete!!!
+  */
+  /*
+    delay(15000); // 5s
+
+    EPD_init();       // EPD init
+    EPD_horizontal(); // EPD  horizontal 7 color
+    EPD_sleep();      // EPD_sleep,Sleep instruction is necessary, please do not delete!!!
+  */
 
   while (1)
     ;
