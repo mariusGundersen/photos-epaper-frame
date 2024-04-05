@@ -58,6 +58,7 @@ void EPD_W21_WriteCMD(unsigned char command);
 void EPD_W21_Init(void);
 void EPD_init(void);
 void PIC_display(const unsigned char *picData);
+void draw4bit(const unsigned char *picData);
 void EPD_sleep(void);
 void EPD_refresh(void);
 void lcd_chkstatus(void);
@@ -83,10 +84,11 @@ int drawImg(JPEGDRAW *pDraw)
 
   for (int y = 0; y < h; y++)
   {
-    for (int x = 0; x < w; x++)
+    for (int x = 0; x < w; x += 2)
     {
-      int grey = (pDraw->pPixels[y * w + x] & 0x7e0) >> 5; // extract just the six green channel bits.
-      epd_buffer[(yOffset + y) * 600 + (xOffset + x)] = grey > 0b100000 ? 0x00 : 0xff;
+      int p1 = (pDraw->pPixels[y * w + x + 0] & 0x7e0) >> 5; // extract just the six green channel bits.
+      int p2 = (pDraw->pPixels[y * w + x + 1] & 0x7e0) >> 5; // extract just the six green channel bits.
+      epd_buffer[(yOffset + y) * 300 + (xOffset + x) / 2] = ((p1 > 0b100000 ? black : white) << 4) | (p2 > 0b100000 ? black : white);
     }
   }
   return 1;
@@ -144,7 +146,7 @@ void setup()
     Serial.print(buffer[i], HEX);
   }
 
-  epd_buffer = (unsigned char *)malloc(600 * 448 * sizeof(char));
+  epd_buffer = (unsigned char *)malloc(300 * 448 * sizeof(char));
   if (jpeg.openRAM(buffer, size, drawImg))
   {
     Serial.println("opened jpeg");
@@ -163,9 +165,9 @@ void setup()
     }
     jpeg.close();
     free(buffer);
-    EPD_init();              // EPD init
-    PIC_display(epd_buffer); // EPD_picture1
-    EPD_sleep();             // EPD_sleep,Sleep instruction is necessary, please do not delete!!!
+    EPD_init();           // EPD init
+    draw4bit(epd_buffer); // EPD_picture1
+    EPD_sleep();          // EPD_sleep,Sleep instruction is necessary, please do not delete!!!
   }
   else
   {
@@ -441,6 +443,24 @@ void PIC_display(const unsigned char *picData)
       data_L = Color_get(temp2);
       data = data_H | data_L;
       EPD_W21_WriteDATA(data);
+    }
+  }
+
+  // Refresh
+  EPD_W21_WriteCMD(0x12); // DISPLAY REFRESH
+  delay(1);               //!!!The delay here is necessary, 200uS at least!!!
+  lcd_chkstatus();        // waiting for the electronic paper IC to release the idle signal
+}
+
+void draw4bit(const unsigned char *picData)
+{
+  Acep_color(Clean); // Each refresh must be cleaned first
+  EPD_W21_WriteCMD(0x10);
+  for (int y = 0; y < 448; y++)
+  {
+    for (int x = 0; x < 300; x++)
+    {
+      EPD_W21_WriteDATA(picData[y * 300 + x]);
     }
   }
 
