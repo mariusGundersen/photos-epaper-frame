@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include "eirik.h"
 #include <WiFi.h>
 #include <WiFiManager.h>
 #include <HTTPClient.h>
@@ -73,10 +72,23 @@ const char *password = "";
 const char *imageUrl = "";
 
 JPEGDEC jpeg;
+unsigned char *epd_buffer;
 
 int drawImg(JPEGDRAW *pDraw)
 {
-  Serial.println("drawImg");
+  int xOffset = pDraw->x;
+  int yOffset = pDraw->y;
+  int w = pDraw->iWidth;
+  int h = pDraw->iHeight;
+
+  for (int y = 0; y < h; y++)
+  {
+    for (int x = 0; x < w; x++)
+    {
+      int grey = (pDraw->pPixels[y * w + x] & 0x7e0) >> 5; // extract just the six green channel bits.
+      epd_buffer[(yOffset + y) * 600 + (xOffset + x)] = grey > 0b100000 ? 0x00 : 0xff;
+    }
+  }
   return 1;
 }
 
@@ -132,13 +144,28 @@ void setup()
     Serial.print(buffer[i], HEX);
   }
 
+  epd_buffer = (unsigned char *)malloc(600 * 448 * sizeof(char));
   if (jpeg.openRAM(buffer, size, drawImg))
   {
     Serial.println("opened jpeg");
     Serial.printf("Image size: %d x %d, orientation: %d, bpp: %d\n", jpeg.getWidth(),
                   jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp());
-    jpeg.setPixelType(RGB565_BIG_ENDIAN);
+
+    unsigned long lTime = micros();
+    if (jpeg.decode(0, 0, 0))
+    {
+      lTime = micros() - lTime;
+      Serial.printf("Decoded image in %d us\n", (int)lTime);
+    }
+    else
+    {
+      Serial.printf("Failed to decode imageg %d", jpeg.getLastError());
+    }
     jpeg.close();
+    free(buffer);
+    EPD_init();              // EPD init
+    PIC_display(epd_buffer); // EPD_picture1
+    EPD_sleep();             // EPD_sleep,Sleep instruction is necessary, please do not delete!!!
   }
   else
   {
@@ -158,10 +185,10 @@ void loop()
 {
   while (1)
   {
-    EPD_init();                   // EPD init
-    PIC_display(gImage_color256); // EPD_picture1
-    EPD_sleep();                  // EPD_sleep,Sleep instruction is necessary, please do not delete!!!
-    delay(15000);                 // 5s
+    EPD_init();              // EPD init
+    PIC_display(epd_buffer); // EPD_picture1
+    EPD_sleep();             // EPD_sleep,Sleep instruction is necessary, please do not delete!!!
+    delay(15000);            // 5s
     // EPD_horizontal
     EPD_init();       // EPD init
     EPD_horizontal(); // EPD  horizontal 7 color
