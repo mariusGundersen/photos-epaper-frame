@@ -16,6 +16,9 @@ int SCK_Pin = D8;
 int SDO_Pin = D9;
 int SDI_Pin = D10;
 
+#define uS_TO_S_FACTOR 1000000ULL /* Conversion factor for micro seconds to seconds */
+#define TIME_TO_SLEEP 5 * 60      /* Time ESP32 will go to sleep (in seconds) */
+
 #define EPD_SIZE(value) value & 0xff, value >> 8
 
 #define isEPD_W21_BUSY digitalRead(BUSY_Pin)
@@ -94,7 +97,6 @@ int drawImg(JPEGDRAW *pDraw)
 
 void setup()
 {
-  digitalWrite(LED_BUILTIN, 1);
   pinMode(BUSY_Pin, INPUT);
   pinMode(RES_Pin, OUTPUT);
   pinMode(DC_Pin, OUTPUT);
@@ -105,11 +107,8 @@ void setup()
   Serial.begin(115200);
 
   delay(5000);
-  digitalWrite(LED_BUILTIN, 0);
 
   wm.autoConnect("e-ink", "password");
-
-  digitalWrite(LED_BUILTIN, 1);
 
   Serial.println("WiFi - Connected");
 
@@ -191,6 +190,14 @@ void setup()
   {
     Serial.printf("Failed to read jpeg %d", jpeg.getLastError());
   }
+
+  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+  Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP) +
+                 " Seconds");
+
+  Serial.println("Going to sleep now");
+  Serial.flush();
+  esp_deep_sleep_start();
 }
 
 void loop()
