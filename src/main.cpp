@@ -69,11 +69,9 @@ void EPD_horizontal(void);
 void EPD_vertical(void);
 void Acep_color(unsigned char color);
 
-const char *ssid = "";
-const char *password = "";
-
 const char *imageUrl = "";
 
+WiFiManager wm;
 JPEGDEC jpeg;
 unsigned char *epd_buffer;
 uint16_t *pixels;
@@ -120,13 +118,7 @@ void setup()
 
   delay(5000);
 
-  WiFi.begin(ssid, password);
-
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    delay(1000);
-    Serial.println("WiFi - Connecting......");
-  }
+  wm.autoConnect("e-ink", "password");
 
   Serial.println("WiFi - Connected");
 
