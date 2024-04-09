@@ -13,21 +13,11 @@ int RES_Pin = D0;
 int DC_Pin = D3;
 int CS_Pin = D1;
 int SCK_Pin = D8;
+int SDO_Pin = D9;
 int SDI_Pin = D10;
 
-#define EPD_W21_MOSI_0 digitalWrite(SDI_Pin, LOW)
-#define EPD_W21_MOSI_1 digitalWrite(SDI_Pin, HIGH)
+#define EPD_SIZE(value) value & 0xff, value >> 8
 
-#define EPD_W21_CLK_0 digitalWrite(SCK_Pin, LOW)
-#define EPD_W21_CLK_1 digitalWrite(SCK_Pin, HIGH)
-
-#define EPD_W21_CS_0 digitalWrite(CS_Pin, LOW)
-#define EPD_W21_CS_1 digitalWrite(CS_Pin, HIGH)
-
-#define EPD_W21_DC_0 digitalWrite(DC_Pin, LOW)
-#define EPD_W21_DC_1 digitalWrite(DC_Pin, HIGH)
-#define EPD_W21_RST_0 digitalWrite(RES_Pin, LOW)
-#define EPD_W21_RST_1 digitalWrite(RES_Pin, HIGH)
 #define isEPD_W21_BUSY digitalRead(BUSY_Pin)
 
 // 8bit
@@ -51,18 +41,13 @@ int SDI_Pin = D10;
 #define clean 0x07  /// 111
 
 ////////FUNCTION//////
-void driver_delay_us(unsigned int xus);
-void driver_delay(unsigned long xms);
-void DELAY_S(unsigned int delaytime);
-void SPI_Delay(unsigned char xrate);
-void SPI_Write(unsigned char value);
 void EPD_W21_WriteDATA(unsigned char command);
 void EPD_W21_WriteCMD(unsigned char command);
 // EPD
 void EPD_W21_Init(void);
 void EPD_init(void);
 void PIC_display(const unsigned char *picData);
-void draw4bit(const unsigned char *picData);
+void draw4bit(uint8_t *picData);
 void EPD_sleep(void);
 void EPD_refresh(void);
 void lcd_chkstatus(void);
@@ -116,9 +101,6 @@ void setup()
   pinMode(CS_Pin, OUTPUT);
   pinMode(SCK_Pin, OUTPUT);
   pinMode(SDI_Pin, OUTPUT);
-  epd_spi = SPIClass(HSPI);
-  epd_spi.begin(SCK_Pin, -1, SDI_Pin, CS_Pin);
-  epd_spi.setFrequency(115200);
 
   Serial.begin(115200);
 
@@ -148,6 +130,9 @@ void setup()
     Serial.println(httpCode);
     return;
   }
+
+  epd_spi = SPIClass();
+  epd_spi.begin(SCK, MISO, MOSI, CS_Pin);
 
   int size = http.getSize();
   Serial.printf("Size: %d\n", size);
@@ -182,13 +167,11 @@ void setup()
     jpeg.close();
     free(buffer);
 
-    int error[3];
-    uint8_t found = floydSteinberg.find_closest_palette_color(0xdf5d, error);
-
-    Serial.printf("found color %d, %d %d %d\n", found, error[0], error[1], error[2]);
-
     epd_buffer = (unsigned char *)malloc(300 * 448 * sizeof(char));
+    lTime = micros();
     floydSteinberg.dither(600, 448, pixels);
+    lTime = micros() - lTime;
+    Serial.printf("Dithered image in %d us\n", (int)lTime);
 
     for (int y = 0; y < 448; y++)
     {
@@ -208,48 +191,11 @@ void setup()
   {
     Serial.printf("Failed to read jpeg %d", jpeg.getLastError());
   }
-
-  /*
-    EPD_init(); // EPD init
-
-    Acep_color(Clean); // Each refresh must be cleaned first
-    EPD_W21_WriteCMD(0x10);
-    for (int y = 0; y < 448; y++)
-    {
-      for (int x = 0; x < 300; x++)
-      {
-        uint8_t c = find_closest_palette_color(((x * 0b111111 / 300) << 5), 7, palette);
-        EPD_W21_WriteDATA((c << 4) | c);
-      }
-    }
-
-    // Refresh
-    EPD_W21_WriteCMD(0x12); // DISPLAY REFRESH
-    delay(1);               //!!!The delay here is necessary, 200uS at least!!!
-    lcd_chkstatus();        // waiting for the electronic paper IC to release the idle signal
-
-    EPD_sleep(); // EPD_sleep,Sleep instruction is necessary, please do not delete!!!
-  */
-  /*
-    delay(15000); // 5s
-
-    EPD_init();       // EPD init
-    EPD_horizontal(); // EPD  horizontal 7 color
-    EPD_sleep();      // EPD_sleep,Sleep instruction is necessary, please do not delete!!!
-  */
-
-  while (1)
-    ;
 }
-
-// Tips//
-/*When the electronic paper is refreshed in full screen, the picture flicker is a normal phenomenon, and the main function is to clear the display afterimage in the previous picture.
-  When the local refresh is performed, the screen does not flash.*/
-/*When you need to transplant the driver, you only need to change the corresponding IO. The BUSY pin is the input mode and the others are the output mode. */
 
 void loop()
 {
-  while (1)
+  /*while (1)
   {
     EPD_init();              // EPD init
     PIC_display(epd_buffer); // EPD_picture1
@@ -275,69 +221,11 @@ void loop()
     delay(5000);         // 5s
     while (1)
       ;
-  }
+  }*/
 }
 
 ///////////////////EXTERNAL FUNCTION////////////////////////////////////////////////////////////////////////
-/////////////////////delay//////////////////////////////////////
-void driver_delay_us(unsigned int xus) // 1us
-{
-  for (; xus > 1; xus--)
-    ;
-}
-void driver_delay(unsigned long xms) // 1ms
-{
-  unsigned long i = 0, j = 0;
-
-  for (j = 0; j < xms; j++)
-  {
-    for (i = 0; i < 256; i++)
-      ;
-  }
-}
-void DELAY_S(unsigned int delaytime)
-{
-  int i, j, k;
-  for (i = 0; i < delaytime; i++)
-  {
-    for (j = 0; j < 4000; j++)
-    {
-      for (k = 0; k < 222; k++)
-        ;
-    }
-  }
-}
 //////////////////////SPI///////////////////////////////////
-void SPI_Delay(unsigned char xrate)
-{
-  unsigned char i;
-  while (xrate)
-  {
-    for (i = 0; i < 2; i++)
-      ;
-    xrate--;
-  }
-}
-
-void SPI_Write(unsigned char value)
-{
-  unsigned char i;
-  SPI_Delay(1);
-  for (i = 0; i < 8; i++)
-  {
-    EPD_W21_CLK_0;
-    SPI_Delay(1);
-    if (value & 0x80)
-      EPD_W21_MOSI_1;
-    else
-      EPD_W21_MOSI_0;
-    value = (value << 1);
-    SPI_Delay(1);
-    driver_delay_us(1);
-    EPD_W21_CLK_1;
-    SPI_Delay(1);
-  }
-}
 
 void EPD_W21_WriteCMD(unsigned char command)
 {
@@ -348,6 +236,28 @@ void EPD_W21_WriteDATA(unsigned char data)
 {
   digitalWrite(DC_Pin, 1); // data write
   epd_spi.write(data);
+}
+void EPD_write(uint8_t command, const uint8_t *data, size_t bytes)
+{
+  digitalWrite(DC_Pin, 0); // command write
+  epd_spi.write(command);
+
+  digitalWrite(DC_Pin, 1); // data write
+  epd_spi.writeBytes(data, bytes);
+}
+void EPD_write(uint8_t command, uint8_t data)
+{
+  digitalWrite(DC_Pin, 0); // command write
+  epd_spi.write(command);
+
+  digitalWrite(DC_Pin, 1); // data write
+  epd_spi.write(data);
+}
+
+template <size_t N>
+void EPD_write(uint8_t command, const uint8_t (&data)[N])
+{
+  EPD_write(command, data, N);
 }
 
 /////////////////EPD settings Functions/////////////////////
@@ -362,82 +272,65 @@ void EPD_init(void)
 {
   EPD_W21_Init(); // Electronic paper IC reset
 
-  EPD_W21_WriteCMD(0x01); // POWER SETTING
-  EPD_W21_WriteDATA(0x37);
-  EPD_W21_WriteDATA(0x00);
-  EPD_W21_WriteDATA(0x23);
-  EPD_W21_WriteDATA(0x23);
+  // POWER SETTING
+  EPD_write(0x01, (const uint8_t[]){0x37, 0x00, 0x23, 0x23});
 
-  EPD_W21_WriteCMD(0X00); // PANNEL SETTING
-  EPD_W21_WriteDATA(0xEF);
-  EPD_W21_WriteDATA(0x08);
+  // PANNEL SETTING
+  EPD_write(0x00, (const uint8_t[]){0xef, 0x08});
 
-  EPD_W21_WriteCMD(0x03); // PFS
-  EPD_W21_WriteDATA(0x00);
+  // PFS
+  EPD_write(0x04, 0x00);
 
-  EPD_W21_WriteCMD(0x06); // boostÉè¶¨
-  EPD_W21_WriteDATA(0xC7);
-  EPD_W21_WriteDATA(0xC7);
-  EPD_W21_WriteDATA(0x1D);
+  // boost
+  EPD_write(0x06, (const uint8_t[]){0xC7, 0xC7, 0x1D});
 
-  EPD_W21_WriteCMD(0x30);  // PLL setting
-  EPD_W21_WriteDATA(0x3C); // PLL:    0-25¡æ:0x3C,25+:0x3A
+  // PLL setting
+  EPD_write(0x30, 0x3C);
 
-  EPD_W21_WriteCMD(0X41); // TSE
-  EPD_W21_WriteDATA(0x00);
+  // TSE
+  EPD_write(0X41, 0x00);
 
-  EPD_W21_WriteCMD(0X50);  // VCOM AND DATA INTERVAL SETTING
-  EPD_W21_WriteDATA(0x37); // 0x77
+  // VCOM AND DATA INTERVAL SETTING
+  EPD_write(0X50, 0x37);
 
-  EPD_W21_WriteCMD(0X60); // TCON SETTING
-  EPD_W21_WriteDATA(0x22);
+  // TCON SETTING
+  EPD_write(0X60, 0x22);
 
-  EPD_W21_WriteCMD(0X60); // TCON SETTING
-  EPD_W21_WriteDATA(0x22);
+  // TCON SETTING
+  EPD_write(0X60, 0x22);
 
-  EPD_W21_WriteCMD(0x61);  // tres
-  EPD_W21_WriteDATA(0x02); // source 600
-  EPD_W21_WriteDATA(0x58);
-  EPD_W21_WriteDATA(0x01); // gate 448
-  EPD_W21_WriteDATA(0xC0);
+  // tres
+  EPD_write(0x61, (const uint8_t[]){EPD_SIZE(600), EPD_SIZE(448)});
 
-  EPD_W21_WriteCMD(0xE3); // PWS
-  EPD_W21_WriteDATA(0xAA);
+  // PWS
+  EPD_write(0xE3, 0xAA);
 
-  EPD_W21_WriteCMD(0x04); // PWR on
-  lcd_chkstatus();        // waiting for the electronic paper IC to release the idle signal
+  // PWR on
+  EPD_W21_WriteCMD(0x04);
+  lcd_chkstatus(); // waiting for the electronic paper IC to release the idle signal
 }
 void EPD_refresh(void)
 {
   EPD_W21_WriteCMD(0x12); // DISPLAY REFRESH
-  driver_delay(100);      //!!!The delay here is necessary, 200uS at least!!!
+  delayMicroseconds(200); //!!!The delay here is necessary, 200uS at least!!!
   lcd_chkstatus();
 }
 void EPD_sleep(void)
 {
   EPD_W21_WriteCMD(0X02); // power off
   lcd_chkstatus();
-  EPD_W21_WriteCMD(0X07); // deep sleep
-  EPD_W21_WriteDATA(0xA5);
+  EPD_write(0X07, 0xA5); // deep sleep
 }
 
 /**********************************display picture**********************************/
 void Acep_color(unsigned char color)
 {
-  unsigned int i, j;
   EPD_W21_WriteCMD(0x10);
-  for (i = 0; i < 448; i++)
-  {
-    for (j = 0; j < 300; j++)
-    {
-      EPD_W21_WriteDATA(color);
-    }
-  }
+  digitalWrite(DC_Pin, 1); // data write
+  epd_spi.writePattern(&color, 1, 300 * 448);
 
   // Refresh
-  EPD_W21_WriteCMD(0x12); // DISPLAY REFRESH
-  delay(1);               //!!!The delay here is necessary, 200uS at least!!!
-  lcd_chkstatus();        // waiting for the electronic paper IC to release the idle signal
+  EPD_refresh();
 }
 /*
 White   /// 001--0XFF
@@ -505,28 +398,17 @@ void PIC_display(const unsigned char *picData)
   }
 
   // Refresh
-  EPD_W21_WriteCMD(0x12); // DISPLAY REFRESH
-  delay(1);               //!!!The delay here is necessary, 200uS at least!!!
-  lcd_chkstatus();        // waiting for the electronic paper IC to release the idle signal
+  EPD_refresh();
 }
 
-void draw4bit(const unsigned char *picData)
+void draw4bit(uint8_t *picData)
 {
   Acep_color(Clean); // Each refresh must be cleaned first
-  EPD_W21_WriteCMD(0x10);
-  // epd_spi.writeBytes(picData, 448 * 300);
-  for (int y = 0; y < 448; y++)
-  {
-    for (int x = 0; x < 300; x++)
-    {
-      EPD_W21_WriteDATA(picData[y * 300 + x]);
-    }
-  }
+
+  EPD_write(0x10, picData, 448 * 300);
 
   // Refresh
-  EPD_W21_WriteCMD(0x12); // DISPLAY REFRESH
-  delay(1);               //!!!The delay here is necessary, 200uS at least!!!
-  lcd_chkstatus();        // waiting for the electronic paper IC to release the idle signal
+  EPD_refresh();
 }
 
 void EPD_horizontal(void)
@@ -547,9 +429,7 @@ void EPD_horizontal(void)
     }
   }
   // Refresh
-  EPD_W21_WriteCMD(0x12); // DISPLAY REFRESH
-  delay(1);               //!!!The delay here is necessary, 200uS at least!!!
-  lcd_chkstatus();        // waiting for the electronic paper IC to release the idle signal
+  EPD_refresh();
 }
 void EPD_vertical(void)
 {
@@ -573,9 +453,7 @@ void EPD_vertical(void)
     }
   }
   // Refresh
-  EPD_W21_WriteCMD(0x12); // DISPLAY REFRESH
-  delay(1);               //!!!The delay here is necessary, 200uS at least!!!
-  lcd_chkstatus();        // waiting for the electronic paper IC to release the idle signal
+  EPD_refresh();
 }
 
 void PIC_display_Clear(void)
@@ -592,9 +470,7 @@ void PIC_display_Clear(void)
   }
 
   // Refresh
-  EPD_W21_WriteCMD(0x12); // DISPLAY REFRESH
-  delay(1);               //!!!The delay here is necessary, 200uS at least!!!
-  lcd_chkstatus();        // waiting for the electronic paper IC to release the idle signal
+  EPD_refresh();
 }
 
 void lcd_chkstatus(void)
