@@ -4,6 +4,7 @@
 #include <HTTPClient.h>
 #include <JPEGDEC.h>
 #include "dither.h"
+#include "Preferences.h"
 
 // IO settings
 int BUSY_Pin = D5;
@@ -69,8 +70,7 @@ void EPD_horizontal(void);
 void EPD_vertical(void);
 void Acep_color(unsigned char color);
 
-const char *imageUrl = "";
-
+Preferences prefs;
 WiFiManager wm;
 JPEGDEC jpeg;
 unsigned char *epd_buffer;
@@ -122,8 +122,15 @@ void setup()
 
   Serial.println("WiFi - Connected");
 
+  // WiFi.mode(WIFI_MODE_APSTA);
+  // WiFi.softAP("e-ink", "password");
+
+  prefs.begin("e-ink");
+
+  // prefs.putString("imageUrl", "...");
+
   HTTPClient http;
-  http.begin(imageUrl);
+  http.begin(prefs.getString("imageUrl"));
   int httpCode = http.GET();
 
   if (httpCode <= 0)
@@ -139,7 +146,7 @@ void setup()
   uint8_t *buffer = (uint8_t *)malloc(size * sizeof(uint8_t));
   pixels = (uint16_t *)malloc(600 * 448 * sizeof(uint16_t));
   uint8_t *write = buffer;
-  Serial.printf("streaming %d", stream->available());
+  Serial.printf("streaming %d\n", stream->available());
   while (http.connected() && stream->available())
   {
     write += stream->readBytes(write, size - (write - buffer));
