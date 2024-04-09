@@ -3,6 +3,7 @@
 #include <WiFiManager.h>
 #include <HTTPClient.h>
 #include <JPEGDEC.h>
+#include <SPI.h>
 #include "dither.h"
 #include "Preferences.h"
 
@@ -72,6 +73,7 @@ void Acep_color(unsigned char color);
 
 Preferences prefs;
 WiFiManager wm;
+SPIClass epd_spi;
 JPEGDEC jpeg;
 unsigned char *epd_buffer;
 uint16_t *pixels;
@@ -107,18 +109,25 @@ int drawImg(JPEGDRAW *pDraw)
 
 void setup()
 {
+  digitalWrite(LED_BUILTIN, 1);
   pinMode(BUSY_Pin, INPUT);
   pinMode(RES_Pin, OUTPUT);
   pinMode(DC_Pin, OUTPUT);
   pinMode(CS_Pin, OUTPUT);
   pinMode(SCK_Pin, OUTPUT);
   pinMode(SDI_Pin, OUTPUT);
+  epd_spi = SPIClass(HSPI);
+  epd_spi.begin(SCK_Pin, -1, SDI_Pin, CS_Pin);
+  epd_spi.setFrequency(115200);
 
   Serial.begin(115200);
 
   delay(5000);
+  digitalWrite(LED_BUILTIN, 0);
 
   wm.autoConnect("e-ink", "password");
+
+  digitalWrite(LED_BUILTIN, 1);
 
   Serial.println("WiFi - Connected");
 
@@ -172,6 +181,11 @@ void setup()
     }
     jpeg.close();
     free(buffer);
+
+    int error[3];
+    uint8_t found = floydSteinberg.find_closest_palette_color(0xdf5d, error);
+
+    Serial.printf("found color %d, %d %d %d\n", found, error[0], error[1], error[2]);
 
     epd_buffer = (unsigned char *)malloc(300 * 448 * sizeof(char));
     floydSteinberg.dither(600, 448, pixels);
@@ -327,27 +341,21 @@ void SPI_Write(unsigned char value)
 
 void EPD_W21_WriteCMD(unsigned char command)
 {
-  SPI_Delay(1);
-  EPD_W21_CS_0;
-  EPD_W21_DC_0; // command write
-  SPI_Write(command);
-  EPD_W21_CS_1;
+  digitalWrite(DC_Pin, 0); // command write
+  epd_spi.write(command);
 }
-void EPD_W21_WriteDATA(unsigned char command)
+void EPD_W21_WriteDATA(unsigned char data)
 {
-  SPI_Delay(1);
-  EPD_W21_CS_0;
-  EPD_W21_DC_1; // command write
-  SPI_Write(command);
-  EPD_W21_CS_1;
+  digitalWrite(DC_Pin, 1); // data write
+  epd_spi.write(data);
 }
 
 /////////////////EPD settings Functions/////////////////////
 void EPD_W21_Init(void)
 {
-  EPD_W21_RST_0; // Module reset
-  delay(100);    // At least 10ms
-  EPD_W21_RST_1;
+  digitalWrite(RES_Pin, 0); // Module reset
+  delay(100);               // At least 10ms
+  digitalWrite(RES_Pin, 1);
   delay(100);
 }
 void EPD_init(void)
@@ -506,6 +514,7 @@ void draw4bit(const unsigned char *picData)
 {
   Acep_color(Clean); // Each refresh must be cleaned first
   EPD_W21_WriteCMD(0x10);
+  // epd_spi.writeBytes(picData, 448 * 300);
   for (int y = 0; y < 448; y++)
   {
     for (int x = 0; x < 300; x++)
