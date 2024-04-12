@@ -14,6 +14,8 @@ for each y from top to bottom do
 #include <stdlib.h>
 #include <Arduino.h>
 
+int clamp(int value, int min, int max);
+
 struct RGB
 {
     RGB(uint16_t pixel)
@@ -29,6 +31,12 @@ struct RGB
     {
         return (uint16_t)(((r) << 11) | ((g) << 5) | (b));
     }
+    void add_error(int e[3], int q)
+    {
+        r = clamp(r + e[0] * q / 16, 0, 0b11111);
+        g = clamp(g + e[1] * q / 16, 0, 0b111111);
+        b = clamp(b + e[2] * q / 16, 0, 0b11111);
+    }
 };
 
 class FloydSteinberg
@@ -43,54 +51,50 @@ public:
     void dither(const int w, const int h, uint16_t *pixels);
 };
 
-int clamp(int value, int min, int max);
-
 FloydSteinberg::FloydSteinberg(uint8_t palette_size, RGB *palette)
 {
     this->palette_size = palette_size;
     this->palette = palette;
 }
 
-void add_error(uint16_t *pixels, int index, int *errors, uint8_t q)
+void add_error(uint16_t *pixel, int errors[3], uint8_t q)
 {
-    RGB rgb = RGB(pixels[index]);
-    rgb.r = clamp(rgb.r + errors[0] * q / 16, 0, 0b11111);
-    rgb.g = clamp(rgb.g + errors[1] * q / 16, 0, 0b111111);
-    rgb.b = clamp(rgb.b + errors[2] * q / 16, 0, 0b11111);
-    pixels[index] = rgb.to565();
+    RGB rgb = RGB(*pixel);
+    rgb.add_error(errors, q);
+    *pixel = rgb.to565();
 }
 
 void FloydSteinberg::dither(const int w, const int h, uint16_t *pixels)
 {
-    for (int y = 0; y < h; y++)
+    int errors[3];
+    int row = 0;
+    for (int y = 0; y < h; y++, row += w)
     {
-        int row = y * w;
         int next_row = row + w;
         bool has_next_row = y + 1 < h;
 
         for (int x = 0; x < w; x++)
         {
             uint16_t oldpixel = pixels[row + x];
-            int errors[3];
             uint16_t newpixel = this->find_closest_palette_color(oldpixel, errors);
             pixels[row + x] = newpixel;
             if (x + 1 < w)
             {
-                add_error(pixels, row + (x + 1), errors, 7);
+                add_error(&pixels[row + (x + 1)], errors, 7);
             }
 
             if (has_next_row)
             {
                 if (x - 1 >= 0)
                 {
-                    add_error(pixels, next_row + (x - 1), errors, 3);
+                    add_error(&pixels[next_row + (x - 1)], errors, 3);
                 }
 
-                add_error(pixels, next_row + (x + 0), errors, 5);
+                add_error(&pixels[next_row + (x + 0)], errors, 5);
 
                 if (x + 1 < w)
                 {
-                    add_error(pixels, next_row + (x + 1), errors, 1);
+                    add_error(&pixels[next_row + (x + 1)], errors, 1);
                 }
             }
         }

@@ -168,7 +168,7 @@ void setup()
   Serial.printf("Size: %d\n", size);
   WiFiClient *stream = http.getStreamPtr();
   uint8_t *buffer = (uint8_t *)malloc(size * sizeof(uint8_t));
-  pixels = (uint16_t *)malloc(600 * 448 * sizeof(uint16_t));
+  pixels = new uint16_t[600 * 448]; //(uint16_t *)malloc(600 * 448 * sizeof(uint16_t));
   uint8_t *write = buffer;
   Serial.printf("streaming %d\n", stream->available());
   while (http.connected() && stream->available())
@@ -228,7 +228,7 @@ void setup()
 
   Serial.println("Going to sleep now");
   Serial.flush();
-  esp_deep_sleep_start();
+  // esp_deep_sleep_start();
 }
 
 void loop()
