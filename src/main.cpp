@@ -19,7 +19,7 @@ int SDI_Pin = D10;
 #define uS_TO_S_FACTOR 1000000ULL /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP 5 * 60      /* Time ESP32 will go to sleep (in seconds) */
 
-#define EPD_SIZE(value) value & 0xff, value >> 8
+#define EPD_SIZE(value) value >> 8, value & 0xff
 
 #define isEPD_W21_BUSY digitalRead(BUSY_Pin)
 
@@ -316,16 +316,16 @@ void EPD_init(void)
   // PANNEL SETTING
   EPD_write(0x00, (const uint8_t[]){0xef, 0x08});
 
-  // PFS
-  EPD_write(0x04, 0x00);
+  // PFS (Power off sequence)
+  EPD_write(0x03, 0x00);
 
-  // boost
+  // BTST (Booster Soft Start)
   EPD_write(0x06, (const uint8_t[]){0xC7, 0xC7, 0x1D});
 
   // PLL setting
   EPD_write(0x30, 0x3C);
 
-  // TSE
+  // TSE (Temperature Sensor Enable)
   EPD_write(0X41, 0x00);
 
   // VCOM AND DATA INTERVAL SETTING
@@ -337,10 +337,10 @@ void EPD_init(void)
   // TCON SETTING
   EPD_write(0X60, 0x22);
 
-  // tres
+  // TRES (Resolution settings, 600x448)
   EPD_write(0x61, (const uint8_t[]){EPD_SIZE(600), EPD_SIZE(448)});
 
-  // PWS
+  // PWS (Power saving?)
   EPD_write(0xE3, 0xAA);
 
   // PWR on
