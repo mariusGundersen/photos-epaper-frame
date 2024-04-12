@@ -66,14 +66,14 @@ JPEGDEC jpeg;
 unsigned char *epd_buffer;
 uint16_t *pixels;
 
-uint16_t palette[7] = {
-    0x0000, // rgb565(0b00000, 0b000000, 0b00000), // black
-    0xffff, // rgb565(0b11111, 0b111111, 0b11111), // white
-    0x3d8e, // rgb565(0b00000, 0x111111, 0x00000), // green
-    0x5a56, // rgb565(0b00000, 0x000000, 0x11111), // blue
-    0xc268, // rgb565(0b11111, 0x000000, 0x00000), // red
-    0xff87, // rgb565(0b11111, 0x111111, 0x00000), // yellow
-    0xf569, // rgb565(0b11111, 0x011111, 0x00000)  // orange
+RGB palette[7] = {
+    0x0000, // black
+    0xffff, // white
+    0x3d8e, // green
+    0x5a56, // blue
+    0xc268, // red
+    0xff87, // yellow
+    0xf569, // orange
 };
 
 FloydSteinberg floydSteinberg(7, palette);
