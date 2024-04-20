@@ -7,6 +7,8 @@
 #include "dither.h"
 #include "Preferences.h"
 #include "epd.h"
+#include <secrets.h>
+#include <ArduinoJson.h>
 
 #define uS_TO_S_FACTOR 1000000ULL /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP 5 * 60      /* Time ESP32 will go to sleep (in seconds) */
@@ -75,6 +77,93 @@ void print_wakeup_reason()
   }
 }
 
+String refreshAccessToken(String refresh_token)
+{
+  HTTPClient http;
+
+  http.useHTTP10(true);
+  http.begin("https://oauth2.googleapis.com/token");
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  int httpCode = http.POST("client_secret=" GOOGLE_CLIENT_SECRET "&grant_type=refresh_token&refresh_token=" + refresh_token + "&client_id=" GOOGLE_CLIENT_ID);
+  if (httpCode != 200)
+  {
+    Serial.print("Failed to refresh access token, HTTP code: ");
+    Serial.println(httpCode);
+    return "";
+  }
+
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, http.getStream());
+
+  if (error)
+  {
+    Serial.println("deserialize fail");
+    Serial.println(error.c_str());
+    return "";
+  }
+
+  const char *access_token = doc["access_token"];
+
+  Serial.printf("Got accesstoken %s\n", access_token);
+
+  http.end();
+  doc.clear();
+  return access_token;
+}
+
+String getImage(String albumId, String access_token, int index)
+{
+  HTTPClient http;
+  JsonDocument doc;
+  String pageToken;
+  JsonArray mediaItems;
+
+  while (true)
+  {
+    http.useHTTP10(true);
+    http.begin("https://photoslibrary.googleapis.com/v1/mediaItems:search?fields=nextPageToken,mediaItems(baseUrl)");
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Authorization", "Bearer " + access_token);
+    int httpCode = http.POST("{\"albumId\":\"" + albumId + "\", \"pageToken\": \"" + pageToken + "\", \"pageSize\": 100}");
+    if (httpCode != 200)
+    {
+      Serial.print("Failed to fetch album json, HTTP code: ");
+      Serial.println(httpCode);
+      return "";
+    }
+
+    DeserializationError error = deserializeJson(doc, http.getStream());
+
+    if (error)
+    {
+      Serial.println("deserialize fail");
+      Serial.println(error.c_str());
+      return "";
+    }
+
+    mediaItems = doc["mediaItems"];
+
+    Serial.printf("Got %d images\n", mediaItems.size());
+
+    if (index < mediaItems.size())
+      break;
+
+    index -= mediaItems.size();
+    const char *token = doc["nextPageToken"];
+    pageToken = token;
+    http.end();
+    doc.clear();
+  }
+
+  const char *baseUrl = mediaItems[index]["baseUrl"];
+
+  Serial.printf("Got baseUrl %s\n", baseUrl);
+
+  http.end();
+  doc.clear();
+  return baseUrl;
+}
+
 void setup()
 {
   Serial.begin(115200);
@@ -94,10 +183,15 @@ void setup()
 
   prefs.begin("e-ink");
 
-  // prefs.putString("imageUrl", "...");
+  // prefs.putString("refresh_token", "...");
+  // prefs.putString("libraryId", "");
+
+  String access_token = refreshAccessToken(prefs.getString("refresh_token"));
+  String imageUrl = getImage(prefs.getString("libraryId"), access_token, random(623));
+  Serial.println(imageUrl);
 
   HTTPClient http;
-  http.begin(prefs.getString("imageUrl"));
+  http.begin(imageUrl + "=w600-h448-c");
   int httpCode = http.GET();
 
   if (httpCode <= 0)
@@ -122,6 +216,7 @@ void setup()
     Serial.printf("read %d\n", write - buffer);
   }
   Serial.println("downloaded image");
+  http.end();
 
   if (jpeg.openRAM(buffer, size, drawImg))
   {
