@@ -11,12 +11,10 @@
 #include <ArduinoJson.h>
 
 #define uS_TO_S_FACTOR 1000000ULL /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP 5 * 60      /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP 10 * 60     /* Time ESP32 will go to sleep (in seconds) */
 
 Preferences prefs;
 WiFiManager wm;
-JPEGDEC jpeg;
-unsigned char *epd_buffer;
 uint16_t *pixels;
 
 RGB palette[7] = {
@@ -89,6 +87,7 @@ String refreshAccessToken(String refresh_token)
   {
     Serial.print("Failed to refresh access token, HTTP code: ");
     Serial.println(httpCode);
+    Serial.println(http.getString());
     return "";
   }
 
@@ -111,24 +110,26 @@ String refreshAccessToken(String refresh_token)
   return access_token;
 }
 
-String getImage(String albumId, String access_token, int index)
+String getImageUrl(String albumId, String access_token, int index)
 {
   HTTPClient http;
   JsonDocument doc;
   String pageToken;
   JsonArray mediaItems;
 
+  String pageSize = String(min(100, index + 1));
   while (true)
   {
     http.useHTTP10(true);
     http.begin("https://photoslibrary.googleapis.com/v1/mediaItems:search?fields=nextPageToken,mediaItems(baseUrl)");
     http.addHeader("Content-Type", "application/json");
     http.addHeader("Authorization", "Bearer " + access_token);
-    int httpCode = http.POST("{\"albumId\":\"" + albumId + "\", \"pageToken\": \"" + pageToken + "\", \"pageSize\": 100}");
+    int httpCode = http.POST("{\"albumId\":\"" + albumId + "\", \"pageToken\": \"" + pageToken + "\", \"pageSize\": " + pageSize + "}");
     if (httpCode != 200)
     {
       Serial.print("Failed to fetch album json, HTTP code: ");
       Serial.println(httpCode);
+      Serial.println(http.getString());
       return "";
     }
 
@@ -143,7 +144,7 @@ String getImage(String albumId, String access_token, int index)
 
     mediaItems = doc["mediaItems"];
 
-    Serial.printf("Got %d images\n", mediaItems.size());
+    Serial.printf("Got %d images of %d\n", mediaItems.size(), index);
 
     if (index < mediaItems.size())
       break;
@@ -162,6 +163,101 @@ String getImage(String albumId, String access_token, int index)
   http.end();
   doc.clear();
   return baseUrl;
+}
+
+JPEGDEC jpeg;
+bool getJpeg(String url, uint16_t *pixels)
+{
+  HTTPClient http;
+  http.begin(url + "=w600-h448-c");
+  int httpCode = http.GET();
+
+  if (httpCode <= 0)
+  {
+    Serial.print("Failed to fetch the JPEG image, HTTP code: ");
+    Serial.println(httpCode);
+    return false;
+  }
+
+  int size = http.getSize();
+  Serial.printf("Size: %d\n", size);
+  WiFiClient *stream = http.getStreamPtr();
+  uint8_t *buffer = new uint8_t[size];
+  stream->readBytes(buffer, size);
+  Serial.println("downloaded image");
+  http.end();
+
+  if (jpeg.openRAM(buffer, size, drawImg))
+  {
+    Serial.println("opened jpeg");
+    Serial.printf("Image size: %d x %d, orientation: %d, bpp: %d\n", jpeg.getWidth(), jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp());
+
+    unsigned long lTime = micros();
+    if (jpeg.decode(0, 0, 0))
+    {
+      lTime = micros() - lTime;
+      Serial.printf("Decoded image in %d us\n", (int)lTime);
+      return true;
+    }
+    else
+    {
+      Serial.printf("Failed to decode imageg %d", jpeg.getLastError());
+      return false;
+    }
+    jpeg.close();
+    delete[] buffer;
+  }
+  else
+  {
+    Serial.printf("Could not open jpeg &d\n", jpeg.getLastError());
+    return false;
+  }
+}
+
+void updatePictureFrame()
+{
+
+  String access_token = refreshAccessToken(prefs.getString("refresh_token"));
+  if (access_token.isEmpty())
+  {
+    Serial.println("Could not get access token");
+    return;
+  }
+
+  String imageUrl = getImageUrl(prefs.getString("libraryId"), access_token, random(623));
+  if (imageUrl.isEmpty())
+  {
+    Serial.println("Could not get image url");
+    return;
+  }
+  Serial.println(imageUrl);
+
+  pixels = new uint16_t[600 * 448];
+  if (!getJpeg(imageUrl, pixels))
+  {
+    return;
+  }
+
+  unsigned long lTime = micros();
+  floydSteinberg.dither(600, 448, pixels);
+  lTime = micros() - lTime;
+  Serial.printf("Dithered image in %d us\n", (int)lTime);
+
+  lTime = micros();
+
+  Epd epd = Epd(D5, D0, D3, D1, SCK, MISO, MOSI);
+  epd.init();           // EPD init
+  epd.draw_color(0x77); // Each refresh must be cleaned first
+
+  epd.draw([&](int x, int y)
+           { return pixels[y * 600 + x]; });
+
+  lTime = micros() - lTime;
+  Serial.printf("Transferred image in %d us\n", (int)lTime);
+
+  // Refresh
+  epd.refresh();
+  epd.sleep();
 }
 
 void setup()
@@ -186,94 +282,15 @@ void setup()
   // prefs.putString("refresh_token", "...");
   // prefs.putString("libraryId", "");
 
-  String access_token = refreshAccessToken(prefs.getString("refresh_token"));
-  String imageUrl = getImage(prefs.getString("libraryId"), access_token, random(623));
-  Serial.println(imageUrl);
-
-  HTTPClient http;
-  http.begin(imageUrl + "=w600-h448-c");
-  int httpCode = http.GET();
-
-  if (httpCode <= 0)
-  {
-    Serial.print("Failed to fetch the JPEG image, HTTP code: ");
-    Serial.println(httpCode);
-    return;
-  }
-
-  Epd epd = Epd(D5, D0, D3, D1, SCK, MISO, MOSI);
-
-  int size = http.getSize();
-  Serial.printf("Size: %d\n", size);
-  WiFiClient *stream = http.getStreamPtr();
-  uint8_t *buffer = (uint8_t *)malloc(size * sizeof(uint8_t));
-  pixels = new uint16_t[600 * 448]; //(uint16_t *)malloc(600 * 448 * sizeof(uint16_t));
-  uint8_t *write = buffer;
-  Serial.printf("streaming %d\n", stream->available());
-  while (http.connected() && stream->available())
-  {
-    write += stream->readBytes(write, size - (write - buffer));
-    Serial.printf("read %d\n", write - buffer);
-  }
-  Serial.println("downloaded image");
-  http.end();
-
-  if (jpeg.openRAM(buffer, size, drawImg))
-  {
-    Serial.println("opened jpeg");
-    Serial.printf("Image size: %d x %d, orientation: %d, bpp: %d\n", jpeg.getWidth(),
-                  jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp());
-
-    unsigned long lTime = micros();
-    if (jpeg.decode(0, 0, 0))
-    {
-      lTime = micros() - lTime;
-      Serial.printf("Decoded image in %d us\n", (int)lTime);
-    }
-    else
-    {
-      Serial.printf("Failed to decode imageg %d", jpeg.getLastError());
-    }
-    jpeg.close();
-    free(buffer);
-
-    epd_buffer = (unsigned char *)malloc(300 * 448 * sizeof(char));
-    lTime = micros();
-    floydSteinberg.dither(600, 448, pixels);
-    lTime = micros() - lTime;
-    Serial.printf("Dithered image in %d us\n", (int)lTime);
-
-    for (int y = 0; y < 448; y++)
-    {
-      for (int x = 0; x < 600; x += 2)
-      {
-        int p1 = pixels[y * 600 + x + 0];
-        int p2 = pixels[y * 600 + x + 1];
-        epd_buffer[y * 300 + x / 2] = (p1 << 4) | (p2 << 0);
-      }
-    }
-
-    epd.init();           // EPD init
-    epd.draw_color(0x77); // Each refresh must be cleaned first
-
-    epd.write(0x10, epd_buffer, 448 * 300);
-
-    // Refresh
-    epd.refresh();
-    epd.sleep(); // EPD_sleep,Sleep instruction is necessary, please do not delete!!!
-  }
-  else
-  {
-    Serial.printf("Failed to read jpeg %d", jpeg.getLastError());
-  }
+  updatePictureFrame();
 
   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
-  Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP) +
-                 " Seconds");
+  Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP) + " Seconds");
 
   Serial.println("Going to sleep now");
   Serial.flush();
-  // esp_deep_sleep_start();
+
+  esp_deep_sleep_start();
 }
 
 void loop()

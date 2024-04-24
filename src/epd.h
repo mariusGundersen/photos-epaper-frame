@@ -147,4 +147,25 @@ public:
         // Refresh
         refresh();
     }
+
+    void draw(std::function<uint8_t(int, int)> lambda)
+    {
+        uint8_t buffer[300];
+
+        write(0x10);
+
+        digitalWrite(DC_Pin, 1); // data write
+        for (int y = 0; y < 448; y++)
+        {
+            for (int x = 0; x < 600; x += 2)
+            {
+                auto p1 = lambda(x + 0, y);
+                auto p2 = lambda(x + 1, y);
+                buffer[x / 2] = (p1 << 4) | (p2 << 0);
+            }
+            spi.writeBytes(buffer, 300);
+        }
+
+        refresh();
+    }
 };
