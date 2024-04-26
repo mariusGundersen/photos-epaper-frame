@@ -55,22 +55,22 @@ void print_wakeup_reason()
   switch (wakeup_reason)
   {
   case ESP_SLEEP_WAKEUP_EXT0:
-    Serial.println("Wakeup caused by external signal using RTC_IO");
+    printf("Wakeup caused by external signal using RTC_IO\n");
     break;
   case ESP_SLEEP_WAKEUP_EXT1:
-    Serial.println("Wakeup caused by external signal using RTC_CNTL");
+    printf("Wakeup caused by external signal using RTC_CNTL\n");
     break;
   case ESP_SLEEP_WAKEUP_TIMER:
-    Serial.println("Wakeup caused by timer");
+    printf("Wakeup caused by timer\n");
     break;
   case ESP_SLEEP_WAKEUP_TOUCHPAD:
-    Serial.println("Wakeup caused by touchpad");
+    printf("Wakeup caused by touchpad\n");
     break;
   case ESP_SLEEP_WAKEUP_ULP:
-    Serial.println("Wakeup caused by ULP program");
+    printf("Wakeup caused by ULP program\n");
     break;
   default:
-    Serial.printf("Wakeup was not caused by deep sleep: %d\n", wakeup_reason);
+    printf("Wakeup was not caused by deep sleep: %d\n", wakeup_reason);
     break;
   }
 }
@@ -85,9 +85,7 @@ String refreshAccessToken(String refresh_token)
   int httpCode = http.POST("client_secret=" GOOGLE_CLIENT_SECRET "&grant_type=refresh_token&refresh_token=" + refresh_token + "&client_id=" GOOGLE_CLIENT_ID);
   if (httpCode != 200)
   {
-    Serial.print("Failed to refresh access token, HTTP code: ");
-    Serial.println(httpCode);
-    Serial.println(http.getString());
+    printf("Failed to refresh access token, HTTP code: %d\n%s\n", httpCode, http.getString());
     return "";
   }
 
@@ -96,14 +94,13 @@ String refreshAccessToken(String refresh_token)
 
   if (error)
   {
-    Serial.println("deserialize fail");
-    Serial.println(error.c_str());
+    printf("deserialize fail\n%s\n", error.c_str());
     return "";
   }
 
   const char *access_token = doc["access_token"];
 
-  Serial.printf("Got accesstoken %s\n", access_token);
+  printf("Got accesstoken %s\n", access_token);
 
   http.end();
   doc.clear();
@@ -127,9 +124,7 @@ String getImageUrl(String albumId, String access_token, int index)
     int httpCode = http.POST("{\"albumId\":\"" + albumId + "\", \"pageToken\": \"" + pageToken + "\", \"pageSize\": " + pageSize + "}");
     if (httpCode != 200)
     {
-      Serial.print("Failed to fetch album json, HTTP code: ");
-      Serial.println(httpCode);
-      Serial.println(http.getString());
+      printf("Failed to fetch album json, HTTP code: %d\n%s\n", httpCode, http.getString());
       return "";
     }
 
@@ -137,14 +132,13 @@ String getImageUrl(String albumId, String access_token, int index)
 
     if (error)
     {
-      Serial.println("deserialize fail");
-      Serial.println(error.c_str());
+      printf("deserialize fail\n%s\n", error.c_str());
       return "";
     }
 
     mediaItems = doc["mediaItems"];
 
-    Serial.printf("Got %d images of %d\n", mediaItems.size(), index);
+    printf("Got %d images of %d\n", mediaItems.size(), index);
 
     if (index < mediaItems.size())
       break;
@@ -158,7 +152,7 @@ String getImageUrl(String albumId, String access_token, int index)
 
   const char *baseUrl = mediaItems[index]["baseUrl"];
 
-  Serial.printf("Got baseUrl %s\n", baseUrl);
+  printf("Got baseUrl %s\n", baseUrl);
 
   http.end();
   doc.clear();
@@ -174,34 +168,33 @@ bool getJpeg(String url, uint16_t *pixels)
 
   if (httpCode <= 0)
   {
-    Serial.print("Failed to fetch the JPEG image, HTTP code: ");
-    Serial.println(httpCode);
+    printf("Failed to fetch the JPEG image, HTTP code: %d\n", httpCode);
     return false;
   }
 
   int size = http.getSize();
-  Serial.printf("Size: %d\n", size);
+  printf("Size: %d\n", size);
   WiFiClient *stream = http.getStreamPtr();
   uint8_t *buffer = new uint8_t[size];
   stream->readBytes(buffer, size);
-  Serial.println("downloaded image");
+  printf("downloaded image\n");
   http.end();
 
   if (jpeg.openRAM(buffer, size, drawImg))
   {
-    Serial.println("opened jpeg");
-    Serial.printf("Image size: %d x %d, orientation: %d, bpp: %d\n", jpeg.getWidth(), jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp());
+    printf("opened jpeg\n");
+    printf("Image size: %d x %d, orientation: %d, bpp: %d\n", jpeg.getWidth(), jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp());
 
     unsigned long lTime = micros();
     if (jpeg.decode(0, 0, 0))
     {
       lTime = micros() - lTime;
-      Serial.printf("Decoded image in %d us\n", (int)lTime);
+      printf("Decoded image in %d us\n", (int)lTime);
       return true;
     }
     else
     {
-      Serial.printf("Failed to decode imageg %d", jpeg.getLastError());
+      printf("Failed to decode imageg %d", jpeg.getLastError());
       return false;
     }
     jpeg.close();
@@ -209,7 +202,7 @@ bool getJpeg(String url, uint16_t *pixels)
   }
   else
   {
-    Serial.printf("Could not open jpeg &d\n", jpeg.getLastError());
+    printf("Could not open jpeg &d\n", jpeg.getLastError());
     return false;
   }
 }
@@ -220,17 +213,16 @@ void updatePictureFrame()
   String access_token = refreshAccessToken(prefs.getString("refresh_token"));
   if (access_token.isEmpty())
   {
-    Serial.println("Could not get access token");
+    printf("Could not get access token\n");
     return;
   }
 
   String imageUrl = getImageUrl(prefs.getString("libraryId"), access_token, random(623));
   if (imageUrl.isEmpty())
   {
-    Serial.println("Could not get image url");
+    printf("Could not get image url\n");
     return;
   }
-  Serial.println(imageUrl);
 
   pixels = new uint16_t[600 * 448];
   if (!getJpeg(imageUrl, pixels))
@@ -241,7 +233,7 @@ void updatePictureFrame()
   unsigned long lTime = micros();
   floydSteinberg.dither(600, 448, pixels);
   lTime = micros() - lTime;
-  Serial.printf("Dithered image in %d us\n", (int)lTime);
+  printf("Dithered image in %d us\n", (int)lTime);
 
   lTime = micros();
 
@@ -253,7 +245,7 @@ void updatePictureFrame()
            { return pixels[y * 600 + x]; });
 
   lTime = micros() - lTime;
-  Serial.printf("Transferred image in %d us\n", (int)lTime);
+  printf("Transferred image in %d us\n", (int)lTime);
 
   // Refresh
   epd.refresh();
@@ -264,7 +256,12 @@ void setup()
 {
   Serial.begin(115200);
 
-  delay(5000);
+  for (int i = 0; i < 10; i++)
+  {
+    delay(1000);
+    if (Serial)
+      break;
+  }
 
   print_wakeup_reason();
 
@@ -272,7 +269,7 @@ void setup()
 
   wm.autoConnect("e-ink", "password");
 
-  Serial.println("WiFi - Connected");
+  printf("WiFi - Connected\n");
 
   // WiFi.mode(WIFI_MODE_APSTA);
   // WiFi.softAP("e-ink", "password");
@@ -285,9 +282,10 @@ void setup()
   updatePictureFrame();
 
   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
-  Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP) + " Seconds");
+  printf("Setup ESP32 to sleep for every %d Seconds\n", TIME_TO_SLEEP);
 
-  Serial.println("Going to sleep now");
+  printf("Going to sleep now\n");
+  if (Serial)
   Serial.flush();
 
   esp_deep_sleep_start();
