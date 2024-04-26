@@ -9,6 +9,8 @@
 #include "epd.h"
 #include <secrets.h>
 #include <ArduinoJson.h>
+#include <esp_adc_cal.h>
+#include <soc/adc_channel.h>
 
 #define uS_TO_S_FACTOR 1000000ULL /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP 10 * 60     /* Time ESP32 will go to sleep (in seconds) */
@@ -252,6 +254,25 @@ void updatePictureFrame()
   epd.sleep();
 }
 
+esp_adc_cal_characteristics_t adc_cal;
+
+void setupBattery()
+{
+  // Setup battery voltage adc
+  esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 0, &adc_cal);
+  adc1_config_channel_atten(ADC1_GPIO5_CHANNEL, ADC_ATTEN_DB_11);
+}
+
+float getBatteryVoltage()
+{
+  uint32_t raw = adc1_get_raw(ADC1_GPIO5_CHANNEL);
+  uint32_t millivolts = esp_adc_cal_raw_to_voltage(raw, &adc_cal);
+  Serial.printf("raw %d, millivolts: %d\n", raw, millivolts);
+  const uint32_t upper_divider = 270;
+  const uint32_t lower_divider = 560;
+  return (float)(upper_divider + lower_divider) / lower_divider / 1000 * millivolts;
+}
+
 void setup()
 {
   Serial.begin(115200);
@@ -264,6 +285,15 @@ void setup()
   }
 
   print_wakeup_reason();
+  setupBattery();
+
+  while (true)
+  {
+    float voltage = getBatteryVoltage();
+    int percent = (voltage - 3.3) / (4.2 - 3.3) * 100;
+    Serial.printf("Battery: %.2fv, %d%%\n", voltage, percent);
+    delay(5000);
+  }
 
   // wm.erase();
 
@@ -286,7 +316,7 @@ void setup()
 
   printf("Going to sleep now\n");
   if (Serial)
-  Serial.flush();
+    Serial.flush();
 
   esp_deep_sleep_start();
 }
