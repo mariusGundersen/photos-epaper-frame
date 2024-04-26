@@ -11,6 +11,7 @@
 #include <ArduinoJson.h>
 #include <esp_adc_cal.h>
 #include <soc/adc_channel.h>
+#include <Adafruit_GFX.h>
 
 #define uS_TO_S_FACTOR 1000000ULL /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP 10 * 60     /* Time ESP32 will go to sleep (in seconds) */
@@ -161,6 +162,27 @@ String getImageUrl(String albumId, String access_token, int index)
   return baseUrl;
 }
 
+esp_adc_cal_characteristics_t adc_cal;
+
+void setupBattery()
+{
+  // Setup battery voltage adc
+  esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 0, &adc_cal);
+  adc1_config_channel_atten(ADC1_GPIO5_CHANNEL, ADC_ATTEN_DB_11);
+}
+
+float getBatteryVoltage()
+{
+  adc_power_acquire();
+  uint32_t raw = adc1_get_raw(ADC1_GPIO5_CHANNEL);
+  uint32_t millivolts = esp_adc_cal_raw_to_voltage(raw, &adc_cal);
+  adc_power_release();
+  Serial.printf("raw %d, millivolts: %d\n", raw, millivolts);
+  const uint32_t upper_divider = 270;
+  const uint32_t lower_divider = 560;
+  return (float)(upper_divider + lower_divider) / lower_divider / 1000 * millivolts;
+}
+
 JPEGDEC jpeg;
 bool getJpeg(String url, uint16_t *pixels)
 {
@@ -209,6 +231,7 @@ bool getJpeg(String url, uint16_t *pixels)
   }
 }
 
+GFXcanvas8 gfx = GFXcanvas8(600, 448);
 void updatePictureFrame()
 {
 
@@ -232,6 +255,9 @@ void updatePictureFrame()
     return;
   }
 
+  wm.disconnect();
+  WiFi.mode(WIFI_OFF);
+
   unsigned long lTime = micros();
   floydSteinberg.dither(600, 448, pixels);
   lTime = micros() - lTime;
@@ -243,8 +269,34 @@ void updatePictureFrame()
   epd.init();           // EPD init
   epd.draw_color(0x77); // Each refresh must be cleaned first
 
+  for (int y = 0; y < 448; y++)
+  {
+    for (int x = 0; x < 600; x++)
+    {
+      gfx.drawPixel(x, y, pixels[y * 600 + x]);
+    }
+  }
+
+  float voltage = getBatteryVoltage();
+  int percent = (voltage - 3.3) / (4.2 - 3.3) * 100;
+  Serial.printf("Battery: %d%% (%.2fv) \n", percent, voltage);
+  int h = 7 + 2 + 2;
+  int y = 448 - h - 1;
+  int x = 4;
+  int w = 9 * 6 + 2;
+  gfx.drawRect(x + 0, y + 0, w + 0, h + 0, 0xffff);                     // draw border
+  gfx.fillRect(x + 1, y + 1, w - 2, h - 2, percent > 20 ? 0x02 : 0x04); // draw fill, green if more than 20%, red otherwise
+  gfx.drawRect(x - 2, y + h / 4, 2, h / 2, 0xffff);                     // draw tip of battery
+  gfx.setCursor(x + 3, y + 2);
+  gfx.setTextColor(0xffff, percent > 20 ? 0x02 : 0x04);
+  gfx.setTextSize(1);
+  gfx.printf("%d%% %.1fv", percent, voltage);
+
+  epd.init();           // EPD init
+  epd.draw_color(0x77); // Each refresh must be cleaned first
+
   epd.draw([&](int x, int y)
-           { return pixels[y * 600 + x]; });
+           { return gfx.getPixel(x, y); });
 
   lTime = micros() - lTime;
   printf("Transferred image in %d us\n", (int)lTime);
@@ -252,25 +304,6 @@ void updatePictureFrame()
   // Refresh
   epd.refresh();
   epd.sleep();
-}
-
-esp_adc_cal_characteristics_t adc_cal;
-
-void setupBattery()
-{
-  // Setup battery voltage adc
-  esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 0, &adc_cal);
-  adc1_config_channel_atten(ADC1_GPIO5_CHANNEL, ADC_ATTEN_DB_11);
-}
-
-float getBatteryVoltage()
-{
-  uint32_t raw = adc1_get_raw(ADC1_GPIO5_CHANNEL);
-  uint32_t millivolts = esp_adc_cal_raw_to_voltage(raw, &adc_cal);
-  Serial.printf("raw %d, millivolts: %d\n", raw, millivolts);
-  const uint32_t upper_divider = 270;
-  const uint32_t lower_divider = 560;
-  return (float)(upper_divider + lower_divider) / lower_divider / 1000 * millivolts;
 }
 
 void setup()
@@ -286,15 +319,6 @@ void setup()
 
   print_wakeup_reason();
   setupBattery();
-
-  while (true)
-  {
-    float voltage = getBatteryVoltage();
-    int percent = (voltage - 3.3) / (4.2 - 3.3) * 100;
-    Serial.printf("Battery: %.2fv, %d%%\n", voltage, percent);
-    delay(5000);
-  }
-
   // wm.erase();
 
   wm.autoConnect("e-ink", "password");
@@ -307,7 +331,7 @@ void setup()
   prefs.begin("e-ink");
 
   // prefs.putString("refresh_token", "...");
-  // prefs.putString("libraryId", "");
+  // prefs.putString("libraryId", "...");
 
   updatePictureFrame();
 
