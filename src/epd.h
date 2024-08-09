@@ -26,6 +26,11 @@ public:
         this->RES_Pin = RES_Pin;
     }
 
+    ~Epd()
+    {
+        spi.end();
+    }
+
     void write(unsigned char command)
     {
         digitalWrite(DC_Pin, 0); // command write

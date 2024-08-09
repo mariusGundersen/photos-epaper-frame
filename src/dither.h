@@ -27,10 +27,11 @@ struct RGB
     uint8_t r;
     uint8_t g;
     uint8_t b;
-    uint16_t to565()
+    operator uint16_t() const
     {
         return (uint16_t)(((r) << 11) | ((g) << 5) | (b));
     }
+
     void add_error(int e[3], int q)
     {
         r = clamp(r + e[0] * q / 16, 0, 0b11111);
@@ -61,7 +62,7 @@ void add_error(uint16_t *pixel, int errors[3], uint8_t q)
 {
     RGB rgb = RGB(*pixel);
     rgb.add_error(errors, q);
-    *pixel = rgb.to565();
+    *pixel = rgb;
 }
 
 void FloydSteinberg::dither(const int w, const int h, uint16_t *pixels)
