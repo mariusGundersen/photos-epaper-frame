@@ -113,11 +113,12 @@ public:
         wait_while_busy(); // waiting for the electronic paper IC to release the idle signal
     }
 
-    void refresh(void)
+    void refresh(bool waitWhileBusy = true)
     {
         write(0x12);            // DISPLAY REFRESH
         delayMicroseconds(200); //!!!The delay here is necessary, 200uS at least!!!
-        wait_while_busy();
+        if (waitWhileBusy)
+            wait_while_busy();
     }
 
     void sleep(void)
@@ -143,14 +144,14 @@ public:
     Orange  /// 110
     CLear   /// 111
     */
-    void draw_color(unsigned char color)
+    void draw_color(unsigned char color, bool waitWhileBusy = true)
     {
         write(0x10);
         digitalWrite(DC_Pin, 1); // data write
         spi.writePattern(&color, 1, 300 * 448);
 
         // Refresh
-        refresh();
+        refresh(waitWhileBusy);
     }
 
     void draw(std::function<uint8_t(int, int)> lambda)

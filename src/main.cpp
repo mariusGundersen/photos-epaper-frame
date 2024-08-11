@@ -14,7 +14,7 @@
 #include <Adafruit_GFX.h>
 #include <driver/rtc_io.h>
 
-// #define DEBUG 1
+#define DEBUG 1
 
 #ifdef DEBUG
 #define DPRINT(...) printf(__VA_ARGS__)
@@ -29,6 +29,17 @@ Preferences prefs;
 WiFiManager wm;
 GFXcanvas16 gfx = GFXcanvas16(600, 448);
 
+enum Palette
+{
+  black = 0,
+  white,
+  green,
+  blue,
+  red,
+  yellow,
+  orange
+};
+
 RGB palette[7] = {
     0x0000, // black
     0xffff, // white
@@ -41,49 +52,41 @@ RGB palette[7] = {
 
 FloydSteinberg floydSteinberg(7, palette);
 
+Epd epd(D5, D0, D3, D1, SCK, MISO, MOSI);
+
 int drawImg(JPEGDRAW *pDraw)
 {
-  int xOffset = pDraw->x;
-  int yOffset = pDraw->y;
-  int w = pDraw->iWidth;
-  int h = pDraw->iHeight;
-
-  gfx.drawRGBBitmap(xOffset, yOffset, pDraw->pPixels, w, h);
+  gfx.drawRGBBitmap(
+      pDraw->x,
+      pDraw->y,
+      pDraw->pPixels,
+      pDraw->iWidth,
+      pDraw->iHeight);
   return 1;
 }
 
 void drawGfxToEpd()
 {
-  unsigned long lTime = micros();
-
-  Epd epd = Epd(D5, D0, D3, D1, SCK, MISO, MOSI);
-
-  epd.init();           // EPD init
-  epd.draw_color(0x77); // Each refresh must be cleaned first
+  epd.wait_while_busy(); // Wait until screen is ready from being cleared earlier
 
   epd.draw([&](int x, int y)
            { return gfx.getPixel(x, y); });
 
-  lTime = micros() - lTime;
-  DPRINT("Transferred image in %d us\n", (int)lTime);
-
-  // Refresh
-  epd.refresh();
   epd.sleep();
 }
 
+void drawErrorMessage(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+
 void drawErrorMessage(const char *fmt, ...)
 {
-  gfx.fillScreen(0);
+  gfx.fillScreen(Palette::red);
   gfx.setCursor(1, 1);
-  gfx.setTextColor(0xffff, palette[1]);
-  gfx.setTextSize(1);
+  gfx.setTextColor(Palette::white, Palette::red);
+  gfx.setTextSize(2);
   va_list args;
   va_start(args, fmt);
   gfx.printf(fmt, args);
   va_end(args);
-
-  drawGfxToEpd();
 }
 
 void print_wakeup_reason()
@@ -163,11 +166,17 @@ String getImageUrl(String albumId, String access_token, int index)
     http.begin("https://photoslibrary.googleapis.com/v1/mediaItems:search?fields=nextPageToken,mediaItems(baseUrl)");
     http.addHeader("Content-Type", "application/json");
     http.addHeader("Authorization", "Bearer " + access_token);
-    int httpCode = http.POST("{\"albumId\":\"" + albumId + "\", \"pageToken\": \"" + pageToken + "\", \"pageSize\": " + pageSize + "}");
+    int httpCode;
+    uint8_t retries = 3;
+    do
+    {
+      httpCode = http.POST("{\"albumId\":\"" + albumId + "\", \"pageToken\": \"" + pageToken + "\", \"pageSize\": " + pageSize + "}");
+    } while (httpCode != 200 && retries-- > 0);
+
     if (httpCode != 200)
     {
-      DPRINT("Failed to fetch album json, HTTP code: %d\n%s\n", httpCode, http.getString());
-      drawErrorMessage("Failed to fetch album json, HTTP code: %d\n%s\n", httpCode, http.getString());
+      DPRINT("Failed to fetch album json, HTTP code: %d\n%s\n", httpCode, http.errorToString(httpCode));
+      drawErrorMessage("Failed to fetch album json, HTTP code: %d\n%s\n", httpCode, http.errorToString(httpCode));
       return "";
     }
 
@@ -215,10 +224,19 @@ void setupBattery()
 float getBatteryVoltage()
 {
   adc_power_acquire();
-  uint32_t raw = adc1_get_raw(ADC1_GPIO5_CHANNEL);
-  uint32_t millivolts = esp_adc_cal_raw_to_voltage(raw, &adc_cal);
+  uint32_t millivolts = 0;
+  for (int i = 0; i < 20; i++)
+  {
+    uint32_t raw = adc1_get_raw(ADC1_GPIO5_CHANNEL);
+    uint32_t mv = esp_adc_cal_raw_to_voltage(raw, &adc_cal);
+    DPRINT("mv: %d\n", mv);
+    millivolts += mv;
+  }
   adc_power_release();
-  DPRINT("raw %d, millivolts: %d\n", raw, millivolts);
+
+  millivolts /= 20;
+
+  DPRINT("millivolts: %d\n", millivolts);
   const float upper_divider = 270.0;
   const float lower_divider = 560.0;
   return (upper_divider + lower_divider) / lower_divider * millivolts / 1000.0;
@@ -260,8 +278,8 @@ bool getJpeg(String url)
     }
     else
     {
-      DPRINT("Failed to decode imageg %d", jpeg.getLastError());
-      drawErrorMessage("Failed to decode imageg %d", jpeg.getLastError());
+      DPRINT("Failed to decode image %d", jpeg.getLastError());
+      drawErrorMessage("Failed to decode image %d", jpeg.getLastError());
       return false;
     }
     jpeg.close();
@@ -275,22 +293,42 @@ bool getJpeg(String url)
   }
 }
 
-void updatePictureFrame(float voltage)
+void drawBattery(float voltage)
 {
+  const float bottomVolt = 3.3;
+  const float lowVolt = 3.7;
+  const float highVolt = 4.0;
+  const float topVolt = 4.2;
+  int percent = voltage < lowVolt    ? (voltage - bottomVolt) / (lowVolt - bottomVolt) * 20
+                : voltage < highVolt ? (voltage - lowVolt) / (highVolt - lowVolt) * 75 + 20
+                                     : (voltage - highVolt) / (topVolt - highVolt) * 5 + 95;
+  DPRINT("Battery: %d%% (%.2fv) \n", percent, voltage);
+  int h = 7 + 3 + 2;
+  int y = 448 - h - 1;
+  int x = 4;
+  int w = 10 * 6 + 2;
+  uint16_t color = percent > 20 ? Palette::green : Palette::red;
+  gfx.drawRect(x + 0, y + 0, w + 0, h + 0, Palette::white); // draw border
+  gfx.fillRect(x + 1, y + 1, w - 2, h - 2, color);          // draw fill, green if more than 20%, red otherwise
+  gfx.drawRect(x - 2, y + 3, 2, h - 6, Palette::white);     // draw tip of battery
+  gfx.drawRect(x - 1, y + 4, 1, h - 8, color);
+  gfx.setCursor(x + 3, y + 2);
+  gfx.setTextColor(1, color);
+  gfx.setTextSize(1);
+  gfx.printf("%d%% %.2fv", percent, voltage);
+}
 
+void updatePictureFrame()
+{
   String access_token = refreshAccessToken(prefs.getString("refresh_token"));
   if (access_token.isEmpty())
   {
-    DPRINT("Could not get access token\n");
-    drawErrorMessage("Could not get access token\n");
     return;
   }
 
   String imageUrl = getImageUrl(prefs.getString("libraryId"), access_token, random(623));
   if (imageUrl.isEmpty())
   {
-    DPRINT("Could not get image url\n");
-    drawErrorMessage("Could not get image url\n");
     return;
   }
 
@@ -302,30 +340,10 @@ void updatePictureFrame(float voltage)
   wm.disconnect();
   WiFi.mode(WIFI_OFF);
 
-  const float lowVolt = 3.3;
-  const float highVolt = 4.2;
-  int percent = (voltage - lowVolt) / (highVolt - lowVolt) * 100;
-  DPRINT("Battery: %d%% (%.2fv) \n", percent, voltage);
-  int h = 7 + 3 + 2;
-  int y = 448 - h - 1;
-  int x = 4;
-  int w = 9 * 6 + 2;
-  uint16_t color = percent > 20 ? palette[2] : palette[4];
-  gfx.drawRect(x + 0, y + 0, w + 0, h + 0, 0xffff); // draw border
-  gfx.fillRect(x + 1, y + 1, w - 2, h - 2, color);  // draw fill, green if more than 20%, red otherwise
-  gfx.drawRect(x - 2, y + 3, 2, h - 6, 0xffff);     // draw tip of battery
-  gfx.drawRect(x - 1, y + 4, 1, h - 8, color);
-  gfx.setCursor(x + 3, y + 2);
-  gfx.setTextColor(0xffff, color);
-  gfx.setTextSize(1);
-  gfx.printf("%d%% %.2fv", percent, voltage);
-
   unsigned long lTime = micros();
   floydSteinberg.dither(600, 448, gfx.getBuffer());
   lTime = micros() - lTime;
   DPRINT("Dithered image in %d us\n", (int)lTime);
-
-  drawGfxToEpd();
 }
 
 void logBattery(float battery)
@@ -337,7 +355,8 @@ void logBattery(float battery)
   String body = "value=" + String(battery, 3);
   DPRINT("Sending body %s\n", body);
   int status = http.POST(body);
-  DPRINT("Got response %d, %s\n", status, http.getString());
+  String response = http.getString();
+  DPRINT("Got response %d, %s\n", status, response);
   http.end();
 }
 
@@ -358,8 +377,12 @@ void setup()
 #endif
   print_wakeup_reason();
   setupBattery();
+
   float voltage = getBatteryVoltage();
   // wm.erase();
+
+  epd.init();                  // EPD init
+  epd.draw_color(0x77, false); // Each refresh must be cleaned first. Don't wait, we can do something useful while it clears
 
   wm.setConnectTimeout(0);
   wm.setConfigPortalTimeout(60);
@@ -379,12 +402,15 @@ void setup()
     // prefs.putString("aio-key", "...");
 
     logBattery(voltage);
-    updatePictureFrame(voltage);
+    updatePictureFrame();
   }
   else
   {
     drawErrorMessage("Could not connect to wifi");
   }
+  drawBattery(voltage);
+
+  drawGfxToEpd();
 
   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
   DPRINT("Setup ESP32 to sleep for every %d Seconds\n", TIME_TO_SLEEP);
