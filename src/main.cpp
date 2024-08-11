@@ -14,7 +14,7 @@
 #include <Adafruit_GFX.h>
 #include <driver/rtc_io.h>
 
-#define DEBUG 1
+// #define DEBUG
 
 #ifdef DEBUG
 #define DPRINT(...) printf(__VA_ARGS__)
@@ -79,9 +79,9 @@ void drawErrorMessage(const char *fmt, ...) __attribute__((format(printf, 1, 2))
 
 void drawErrorMessage(const char *fmt, ...)
 {
-  gfx.fillScreen(Palette::red);
+  gfx.fillScreen(Palette::white);
   gfx.setCursor(1, 1);
-  gfx.setTextColor(Palette::white, Palette::red);
+  gfx.setTextColor(Palette::red, Palette::white);
   gfx.setTextSize(2);
   va_list args;
   va_start(args, fmt);
@@ -217,8 +217,8 @@ esp_adc_cal_characteristics_t adc_cal;
 void setupBattery()
 {
   // Setup battery voltage adc
-  esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 0, &adc_cal);
-  adc1_config_channel_atten(ADC1_GPIO5_CHANNEL, ADC_ATTEN_DB_11);
+  esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_12, ADC_WIDTH_BIT_12, 0, &adc_cal);
+  adc1_config_channel_atten(ADC1_GPIO5_CHANNEL, ADC_ATTEN_DB_12);
 }
 
 float getBatteryVoltage()
