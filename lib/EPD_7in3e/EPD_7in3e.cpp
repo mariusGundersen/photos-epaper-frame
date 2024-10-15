@@ -71,6 +71,19 @@ static void EPD_7IN3E_SendData(UBYTE Data)
 }
 
 /******************************************************************************
+function :  send data
+parameter:
+    Data : Write data
+******************************************************************************/
+static void EPD_7IN3E_SendData(UBYTE *pData, UDOUBLE len)
+{
+    DEV_Digital_Write(EPD_DC_PIN, 1);
+    DEV_Digital_Write(EPD_CS_PIN, 0);
+    DEV_SPI_Write_nByte(pData, len);
+    DEV_Digital_Write(EPD_CS_PIN, 1);
+}
+
+/******************************************************************************
 function :  Wait until the busy_pin goes LOW
 parameter:
 ******************************************************************************/
@@ -313,6 +326,26 @@ void EPD_7IN3E_DisplayPart(const UBYTE *Image, UWORD xstart, UWORD ystart, UWORD
             }
         }
     }
+    EPD_7IN3E_TurnOnDisplay();
+}
+
+void draw(std::function<uint8_t(int, int)> lambda)
+{
+    uint8_t buffer[EPD_7IN3E_WIDTH / 2];
+
+    EPD_7IN3E_SendCommand(0x10);
+
+    for (int y = 0; y < EPD_7IN3E_HEIGHT; y++)
+    {
+        for (int x = 0; x < EPD_7IN3E_WIDTH; x += 2)
+        {
+            auto p1 = lambda(x + 0, y);
+            auto p2 = lambda(x + 1, y);
+            buffer[x / 2] = (p1 << 4) | (p2 << 0);
+        }
+        EPD_7IN3E_SendData(buffer, EPD_7IN3E_WIDTH / 2);
+    }
+
     EPD_7IN3E_TurnOnDisplay();
 }
 

@@ -56,6 +56,7 @@ void EPD_7IN3E_Show7Block(void);
 void EPD_7IN3E_Show(void);
 void EPD_7IN3E_Display(UBYTE *Image);
 void EPD_7IN3E_DisplayPart(const UBYTE *Image, UWORD xstart, UWORD ystart, UWORD image_width, UWORD image_heigh);
+void draw(std::function<uint8_t(int, int)> lambda);
 void EPD_7IN3E_Sleep(void);
 
 #endif

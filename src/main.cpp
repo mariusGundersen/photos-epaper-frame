@@ -1,11 +1,23 @@
 #include <Arduino.h>
 #include <EPD_7in3e.h>
 #include <Adafruit_ST7789.h>
+#include <Dither.h>
 
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, -1);
 uint8_t x = 0;
 uint16_t rgb = 0;
-GFXcanvas8 epd = GFXcanvas8(EPD_7IN3E_WIDTH, EPD_7IN3E_HEIGHT);
+GFXcanvas16 epd = GFXcanvas16(EPD_7IN3E_WIDTH, EPD_7IN3E_HEIGHT);
+
+RGB palette[6] = {
+    ST77XX_BLACK,  // black
+    ST77XX_WHITE,  // white
+    ST77XX_YELLOW, // yellow
+    ST77XX_RED,
+    ST77XX_BLUE,
+    ST77XX_GREEN,
+};
+
+FloydSteinberg floydSteinberg(6, palette);
 
 void setup()
 {
@@ -42,15 +54,20 @@ void setup()
   DEV_Delay_ms(1000);
 
   epd.fillScreen(EPD_7IN3E_BLACK);
-  /*  epd.drawRect(0, 0, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_BLACK);
-    epd.drawRect(0, 133, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_BLUE);
-    epd.drawRect(0, 266, 134, EPD_7IN3E_HEIGHT, EPD_7IN3E_RED);
-    epd.drawRect(0, 400, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_GREEN);
-    epd.drawRect(0, 533, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_YELLOW);
-    epd.drawRect(0, 666, 134, EPD_7IN3E_HEIGHT, EPD_7IN3E_WHITE);
+  epd.fillRect(0, 0, 133, 200, EPD_7IN3E_BLACK); // this line causes it to crash. why?
+
+  // epd.fillRect(0, 133, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_BLUE);
+  /*
+  epd.drawRect(0, 266, 134, EPD_7IN3E_HEIGHT, EPD_7IN3E_RED);
+  epd.drawRect(0, 400, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_GREEN);
+  epd.drawRect(0, 533, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_YELLOW);
+  epd.drawRect(0, 666, 134, EPD_7IN3E_HEIGHT, EPD_7IN3E_WHITE);
+
+  draw([&](int x, int y)
+       { return epd.getPixel(x, y); });
+
+  // EPD_7IN3E_Show7Block();
   */
-  // EPD_7IN3E_Display(epd.getBuffer());
-  EPD_7IN3E_Show();
 
   EPD_7IN3E_Sleep();
 

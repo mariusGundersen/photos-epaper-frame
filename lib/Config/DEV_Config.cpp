@@ -96,8 +96,7 @@ void DEV_SPI_WriteByte(UBYTE data)
 
 void DEV_SPI_Write_nByte(UBYTE *pData, UDOUBLE len)
 {
-    for (int i = 0; i < len; i++)
-        DEV_SPI_WriteByte(pData[i]);
+    SPI.writeBytes(pData, len);
 }
 
 void DEV_SPI_SendByte(UBYTE data)
