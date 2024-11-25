@@ -7,14 +7,13 @@
 #include "dither.h"
 #include "Preferences.h"
 #include "epd.h"
-#include <secrets.h>
 #include <ArduinoJson.h>
 #include <esp_adc_cal.h>
 #include <soc/adc_channel.h>
 #include <Adafruit_GFX.h>
 #include <driver/rtc_io.h>
 
-// #define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
 #define DPRINT(...) printf(__VA_ARGS__)
@@ -51,6 +50,23 @@ RGB palette[7] = {
 };
 
 FloydSteinberg floydSteinberg(7, palette);
+
+/**
+ * Used pins
+ *
+ * D0 [X] EPD-RESET       [X] 5V
+ * D1 [X] EPD-CS          [X] GND
+ * D2 [ ] WAKE            [X] 3V3
+ * D3 [X] EPD-DC     MOSI [X] D10
+ * D4 [X] ADC        MISO [X] D9
+ * D5 [X] EPD-BUSY    SCK [X] D8
+ * D6 [ ]                 [ ] D7
+ *
+ *
+ *
+ *
+ *
+ */
 
 Epd epd(D5, D0, D3, D1, SCK, MISO, MOSI);
 
@@ -118,14 +134,14 @@ void print_wakeup_reason()
   }
 }
 
-String refreshAccessToken(String refresh_token)
+String refreshAccessToken(String client_id, String client_secret, String refresh_token)
 {
   HTTPClient http;
 
   http.useHTTP10(true);
   http.begin("https://oauth2.googleapis.com/token");
   http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-  int httpCode = http.POST("client_secret=" GOOGLE_CLIENT_SECRET "&grant_type=refresh_token&refresh_token=" + refresh_token + "&client_id=" GOOGLE_CLIENT_ID);
+  int httpCode = http.POST("client_secret=" + client_secret + "&grant_type=refresh_token&refresh_token=" + refresh_token + "&client_id=" + client_id);
   if (httpCode != 200)
   {
     DPRINT("Failed to refresh access token, HTTP code: %d\n%s\n", httpCode, http.getString());
@@ -320,22 +336,24 @@ void drawBattery(float voltage)
 
 void updatePictureFrame()
 {
-  String access_token = refreshAccessToken(prefs.getString("refresh_token"));
-  if (access_token.isEmpty())
-  {
-    return;
-  }
+  String access_token = refreshAccessToken(
+      prefs.getString("client_id"),
+      prefs.getString("client_secret"),
+      prefs.getString("refresh_token"));
 
-  String imageUrl = getImageUrl(prefs.getString("libraryId"), access_token, random(623));
-  if (imageUrl.isEmpty())
-  {
+  if (access_token.isEmpty())
     return;
-  }
+
+  String imageUrl = getImageUrl(
+      prefs.getString("libraryId"),
+      access_token,
+      random(623));
+
+  if (imageUrl.isEmpty())
+    return;
 
   if (!getJpeg(imageUrl))
-  {
     return;
-  }
 
   wm.disconnect();
   WiFi.mode(WIFI_OFF);
@@ -358,6 +376,10 @@ void logBattery(float battery)
   String response = http.getString();
   DPRINT("Got response %d, %s\n", status, response);
   http.end();
+}
+
+void touchWakeupCallback()
+{
 }
 
 void setup()
@@ -397,9 +419,21 @@ void setup()
 
     prefs.begin("e-ink");
 
-    // prefs.putString("refresh_token", "...");
-    // prefs.putString("libraryId", "...");
-    // prefs.putString("aio-key", "...");
+#ifdef GOOGLE_CLIENT_ID
+    prefs.putString("client_id", GOOGLE_CLIENT_ID);
+#endif
+#ifdef GOOGLE_CLIENT_SECRET
+    prefs.putString("client_secret", GOOGLE_CLIENT_SECRET);
+#endif
+#ifdef GOOGLE_REFRESH_TOKEN
+    prefs.putString("refresh_token", GOOGLE_REFRESH_TOKEN);
+#endif
+#ifdef LIBRARY_ID
+    prefs.putString("libraryId", LIBRARY_ID);
+#endif
+#ifdef AIO_KEY
+    prefs.putString("aio-key", AIO_KEY);
+#endif
 
     logBattery(voltage);
     updatePictureFrame();
@@ -415,7 +449,7 @@ void setup()
   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
   DPRINT("Setup ESP32 to sleep for every %d Seconds\n", TIME_TO_SLEEP);
 
-  // esp_sleep_enable_ext1_wakeup(1 << GPIO_NUM_4, ESP_EXT1_WAKEUP_ANY_HIGH);
+  // esp_sleep_enable_ext1_wakeup(1 << D2, ESP_EXT1_WAKEUP_ALL_LOW);
 
   DPRINT("Going to sleep now\n");
   if (Serial)
