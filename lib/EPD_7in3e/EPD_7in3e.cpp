@@ -29,19 +29,20 @@
 #
 ******************************************************************************/
 #include "EPD_7in3e.h"
+#include <SPI.h>
 
 /******************************************************************************
 function :  Software reset
 parameter:
 ******************************************************************************/
-static void EPD_7IN3E_Reset(void)
+void EPD_7in3e::reset(void)
 {
-    DEV_Digital_Write(EPD_RST_PIN, 1);
-    DEV_Delay_ms(20);
-    DEV_Digital_Write(EPD_RST_PIN, 0);
-    DEV_Delay_ms(2);
-    DEV_Digital_Write(EPD_RST_PIN, 1);
-    DEV_Delay_ms(20);
+    digitalWrite(_reset, 1);
+    delay(20);
+    digitalWrite(_reset, 0);
+    delay(2);
+    digitalWrite(_reset, 1);
+    delay(20);
 }
 
 /******************************************************************************
@@ -49,12 +50,12 @@ function :  send command
 parameter:
      Reg : Command register
 ******************************************************************************/
-static void EPD_7IN3E_SendCommand(UBYTE Reg)
+void EPD_7in3e::sendCommand(uint8_t Reg)
 {
-    DEV_Digital_Write(EPD_DC_PIN, 0);
-    DEV_Digital_Write(EPD_CS_PIN, 0);
-    DEV_SPI_WriteByte(Reg);
-    DEV_Digital_Write(EPD_CS_PIN, 1);
+    digitalWrite(_dc, 0);
+    digitalWrite(_cs, 0);
+    SPI.write(Reg);
+    digitalWrite(_cs, 1);
 }
 
 /******************************************************************************
@@ -62,12 +63,12 @@ function :  send data
 parameter:
     Data : Write data
 ******************************************************************************/
-static void EPD_7IN3E_SendData(UBYTE Data)
+void EPD_7in3e::sendData(uint8_t Data)
 {
-    DEV_Digital_Write(EPD_DC_PIN, 1);
-    DEV_Digital_Write(EPD_CS_PIN, 0);
-    DEV_SPI_WriteByte(Data);
-    DEV_Digital_Write(EPD_CS_PIN, 1);
+    digitalWrite(_dc, 1);
+    digitalWrite(_cs, 0);
+    SPI.write(Data);
+    digitalWrite(_cs, 1);
 }
 
 /******************************************************************************
@@ -75,290 +76,196 @@ function :  send data
 parameter:
     Data : Write data
 ******************************************************************************/
-static void EPD_7IN3E_SendData(UBYTE *pData, UDOUBLE len)
+void EPD_7in3e::sendData(uint8_t *pData, uint32_t len)
 {
-    DEV_Digital_Write(EPD_DC_PIN, 1);
-    DEV_Digital_Write(EPD_CS_PIN, 0);
-    DEV_SPI_Write_nByte(pData, len);
-    DEV_Digital_Write(EPD_CS_PIN, 1);
+    digitalWrite(_dc, 1);
+    digitalWrite(_cs, 0);
+    SPI.writeBytes(pData, len);
+    digitalWrite(_cs, 1);
 }
 
 /******************************************************************************
 function :  Wait until the busy_pin goes LOW
 parameter:
 ******************************************************************************/
-static void EPD_7IN3E_ReadBusyH(void)
+void EPD_7in3e::readBusyH(void)
 {
-    Debug("e-Paper busy H\r\n");
-    while (!DEV_Digital_Read(EPD_BUSY_PIN))
+    log_d("e-Paper busy H\r\n");
+    while (!digitalRead(_busy))
     { // LOW: busy, HIGH: idle
-        DEV_Delay_ms(1);
+        delay(1);
     }
-    Debug("e-Paper busy H release\r\n");
+    log_d("e-Paper busy H release\r\n");
+}
+
+EPD_7in3e::EPD_7in3e(uint8_t cs, uint8_t dc, uint8_t busy, uint8_t reset)
+{
+    _cs = cs;
+    _dc = dc;
+    _busy = busy;
+    _reset = reset;
 }
 
 /******************************************************************************
 function :  Turn On Display
 parameter:
 ******************************************************************************/
-static void EPD_7IN3E_TurnOnDisplay(void)
+void EPD_7in3e::turnOnDisplay(void)
 {
 
-    EPD_7IN3E_SendCommand(0x04); // POWER_ON
-    EPD_7IN3E_ReadBusyH();
+    sendCommand(0x04); // POWER_ON
+    readBusyH();
 
     // Second setting
-    EPD_7IN3E_SendCommand(0x06);
-    EPD_7IN3E_SendData(0x6F);
-    EPD_7IN3E_SendData(0x1F);
-    EPD_7IN3E_SendData(0x17);
-    EPD_7IN3E_SendData(0x49);
+    sendCommand(0x06);
+    sendData(0x6F);
+    sendData(0x1F);
+    sendData(0x17);
+    sendData(0x49);
 
-    EPD_7IN3E_SendCommand(0x12); // DISPLAY_REFRESH
-    EPD_7IN3E_SendData(0x00);
-    EPD_7IN3E_ReadBusyH();
+    sendCommand(0x12); // DISPLAY_REFRESH
+    sendData(0x00);
+    readBusyH();
 
-    EPD_7IN3E_SendCommand(0x02); // POWER_OFF
-    EPD_7IN3E_SendData(0X00);
-    EPD_7IN3E_ReadBusyH();
+    sendCommand(0x02); // POWER_OFF
+    sendData(0X00);
+    readBusyH();
 }
 
 /******************************************************************************
 function :  Initialize the e-Paper register
 parameter:
 ******************************************************************************/
-void EPD_7IN3E_Init(void)
+void EPD_7in3e::init(void)
 {
-    EPD_7IN3E_Reset();
-    EPD_7IN3E_ReadBusyH();
-    DEV_Delay_ms(30);
+    pinMode(_busy, INPUT);
+    pinMode(_reset, OUTPUT);
+    pinMode(_dc, OUTPUT);
+    pinMode(_cs, OUTPUT);
 
-    EPD_7IN3E_SendCommand(0xAA); // CMDH
-    EPD_7IN3E_SendData(0x49);
-    EPD_7IN3E_SendData(0x55);
-    EPD_7IN3E_SendData(0x20);
-    EPD_7IN3E_SendData(0x08);
-    EPD_7IN3E_SendData(0x09);
-    EPD_7IN3E_SendData(0x18);
+    digitalWrite(_cs, HIGH);
 
-    EPD_7IN3E_SendCommand(0x01); //
-    EPD_7IN3E_SendData(0x3F);
+    reset();
+    readBusyH();
+    delay(30);
 
-    EPD_7IN3E_SendCommand(0x00);
-    EPD_7IN3E_SendData(0x5F);
-    EPD_7IN3E_SendData(0x69);
+    sendCommand(0xAA); // CMDH
+    sendData(0x49);
+    sendData(0x55);
+    sendData(0x20);
+    sendData(0x08);
+    sendData(0x09);
+    sendData(0x18);
 
-    EPD_7IN3E_SendCommand(0x03);
-    EPD_7IN3E_SendData(0x00);
-    EPD_7IN3E_SendData(0x54);
-    EPD_7IN3E_SendData(0x00);
-    EPD_7IN3E_SendData(0x44);
+    sendCommand(0x01); //
+    sendData(0x3F);
 
-    EPD_7IN3E_SendCommand(0x05);
-    EPD_7IN3E_SendData(0x40);
-    EPD_7IN3E_SendData(0x1F);
-    EPD_7IN3E_SendData(0x1F);
-    EPD_7IN3E_SendData(0x2C);
+    sendCommand(0x00);
+    sendData(0x5F);
+    sendData(0x69);
 
-    EPD_7IN3E_SendCommand(0x06);
-    EPD_7IN3E_SendData(0x6F);
-    EPD_7IN3E_SendData(0x1F);
-    EPD_7IN3E_SendData(0x17);
-    EPD_7IN3E_SendData(0x49);
+    sendCommand(0x03);
+    sendData(0x00);
+    sendData(0x54);
+    sendData(0x00);
+    sendData(0x44);
 
-    EPD_7IN3E_SendCommand(0x08);
-    EPD_7IN3E_SendData(0x6F);
-    EPD_7IN3E_SendData(0x1F);
-    EPD_7IN3E_SendData(0x1F);
-    EPD_7IN3E_SendData(0x22);
+    sendCommand(0x05);
+    sendData(0x40);
+    sendData(0x1F);
+    sendData(0x1F);
+    sendData(0x2C);
 
-    EPD_7IN3E_SendCommand(0x30);
-    EPD_7IN3E_SendData(0x03);
+    sendCommand(0x06);
+    sendData(0x6F);
+    sendData(0x1F);
+    sendData(0x17);
+    sendData(0x49);
 
-    EPD_7IN3E_SendCommand(0x50);
-    EPD_7IN3E_SendData(0x3F);
+    sendCommand(0x08);
+    sendData(0x6F);
+    sendData(0x1F);
+    sendData(0x1F);
+    sendData(0x22);
 
-    EPD_7IN3E_SendCommand(0x60);
-    EPD_7IN3E_SendData(0x02);
-    EPD_7IN3E_SendData(0x00);
+    sendCommand(0x30);
+    sendData(0x03);
 
-    EPD_7IN3E_SendCommand(0x61);
-    EPD_7IN3E_SendData(0x03);
-    EPD_7IN3E_SendData(0x20);
-    EPD_7IN3E_SendData(0x01);
-    EPD_7IN3E_SendData(0xE0);
+    sendCommand(0x50);
+    sendData(0x3F);
 
-    EPD_7IN3E_SendCommand(0x84);
-    EPD_7IN3E_SendData(0x01);
+    sendCommand(0x60);
+    sendData(0x02);
+    sendData(0x00);
 
-    EPD_7IN3E_SendCommand(0xE3);
-    EPD_7IN3E_SendData(0x2F);
+    sendCommand(0x61);
+    sendData(0x03);
+    sendData(0x20);
+    sendData(0x01);
+    sendData(0xE0);
 
-    EPD_7IN3E_SendCommand(0x04); // PWR on
-    EPD_7IN3E_ReadBusyH();       // waiting for the electronic paper IC to release the idle signal
+    sendCommand(0x84);
+    sendData(0x01);
+
+    sendCommand(0xE3);
+    sendData(0x2F);
+
+    sendCommand(0x04); // PWR on
+    readBusyH();       // waiting for the electronic paper IC to release the idle signal
 }
 
 /******************************************************************************
 function :  Clear screen
 parameter:
 ******************************************************************************/
-void EPD_7IN3E_Clear(UBYTE color)
+void EPD_7in3e::clear(uint8_t color)
 {
-    UWORD Width, Height;
-    Width = (EPD_7IN3E_WIDTH % 2 == 0) ? (EPD_7IN3E_WIDTH / 2) : (EPD_7IN3E_WIDTH / 2 + 1);
-    Height = EPD_7IN3E_HEIGHT;
+    uint16_t Width, Height;
+    Width = (_width % 2 == 0) ? (_width / 2) : (_width / 2 + 1);
+    Height = _height;
 
-    EPD_7IN3E_SendCommand(0x10);
-    for (UWORD j = 0; j < Height; j++)
+    sendCommand(0x10);
+    for (uint16_t j = 0; j < Height; j++)
     {
-        for (UWORD i = 0; i < Width; i++)
+        for (uint16_t i = 0; i < Width; i++)
         {
-            EPD_7IN3E_SendData((color << 4) | color);
+            sendData((color << 4) | color);
         }
     }
 
-    EPD_7IN3E_TurnOnDisplay();
+    turnOnDisplay();
 }
 
-/******************************************************************************
-function :  show 7 kind of color block
-parameter:
-******************************************************************************/
-void EPD_7IN3E_Show7Block(void)
+void EPD_7in3e::draw(std::function<uint8_t(int, int)> lambda)
 {
-    unsigned long i, j, k;
-    unsigned char const Color_seven[6] =
-        {EPD_7IN3E_BLACK, EPD_7IN3E_YELLOW, EPD_7IN3E_RED, EPD_7IN3E_BLUE, EPD_7IN3E_GREEN, EPD_7IN3E_WHITE};
+    uint8_t buffer[_width / 2];
 
-    EPD_7IN3E_SendCommand(0x10);
-    for (k = 0; k < 6; k++)
+    sendCommand(0x10);
+
+    for (int y = 0; y < _height; y++)
     {
-        for (j = 0; j < 20000; j++)
-        {
-            EPD_7IN3E_SendData((Color_seven[k] << 4) | Color_seven[k]);
-        }
-    }
-    EPD_7IN3E_TurnOnDisplay();
-}
-
-void EPD_7IN3E_Show(void)
-{
-    unsigned long k, o;
-    unsigned char const Color_seven[6] =
-        {EPD_7IN3E_BLACK, EPD_7IN3E_YELLOW, EPD_7IN3E_RED, EPD_7IN3E_BLUE, EPD_7IN3E_GREEN, EPD_7IN3E_WHITE};
-
-    UWORD Width, Height;
-    Width = (EPD_7IN3E_WIDTH % 2 == 0) ? (EPD_7IN3E_WIDTH / 2) : (EPD_7IN3E_WIDTH / 2 + 1);
-    Height = EPD_7IN3E_HEIGHT;
-    k = 0;
-    o = 0;
-
-    EPD_7IN3E_SendCommand(0x10);
-    for (UWORD j = 0; j < Height; j++)
-    {
-        if ((j > 10) && (j < 50))
-            for (UWORD i = 0; i < Width; i++)
-            {
-                EPD_7IN3E_SendData((Color_seven[0] << 4) | Color_seven[0]);
-            }
-        else if (o < Height / 2)
-            for (UWORD i = 0; i < Width; i++)
-            {
-                EPD_7IN3E_SendData((Color_seven[0] << 4) | Color_seven[0]);
-            }
-
-        else
-        {
-            for (UWORD i = 0; i < Width; i++)
-            {
-                EPD_7IN3E_SendData((Color_seven[k] << 4) | Color_seven[k]);
-            }
-            k++;
-            if (k >= 6)
-                k = 0;
-        }
-
-        o++;
-        if (o >= Height)
-            o = 0;
-    }
-    EPD_7IN3E_TurnOnDisplay();
-}
-
-/******************************************************************************
-function :  Sends the image buffer in RAM to e-Paper and displays
-parameter:
-******************************************************************************/
-void EPD_7IN3E_Display(UBYTE *Image)
-{
-    UWORD Width, Height;
-    Width = EPD_7IN3E_WIDTH;
-    Height = EPD_7IN3E_HEIGHT;
-    int Length = EPD_7IN3E_HEIGHT * EPD_7IN3E_WIDTH;
-
-    EPD_7IN3E_SendCommand(0x10);
-    for (UWORD j = 0; j < Length; j += 2)
-    {
-        EPD_7IN3E_SendData((Image[j] << 4) | Image[j + 1]);
-    }
-    EPD_7IN3E_TurnOnDisplay();
-}
-
-void EPD_7IN3E_DisplayPart(const UBYTE *Image, UWORD xstart, UWORD ystart, UWORD image_width, UWORD image_heigh)
-{
-    unsigned long i, j;
-    UWORD Width, Height;
-    Width = (EPD_7IN3E_WIDTH % 2 == 0) ? (EPD_7IN3E_WIDTH / 2) : (EPD_7IN3E_WIDTH / 2 + 1);
-    Height = EPD_7IN3E_HEIGHT;
-
-    EPD_7IN3E_SendCommand(0x10);
-    for (i = 0; i < Height; i++)
-    {
-        for (j = 0; j < Width; j++)
-        {
-            if (i < image_heigh + ystart && i >= ystart && j < (image_width + xstart) / 2 && j >= xstart / 2)
-            {
-                EPD_7IN3E_SendData(Image[(j - xstart / 2) + (image_width / 2 * (i - ystart))]);
-            }
-            else
-            {
-                EPD_7IN3E_SendData(0x11);
-            }
-        }
-    }
-    EPD_7IN3E_TurnOnDisplay();
-}
-
-void draw(std::function<uint8_t(int, int)> lambda)
-{
-    uint8_t buffer[EPD_7IN3E_WIDTH / 2];
-
-    EPD_7IN3E_SendCommand(0x10);
-
-    for (int y = 0; y < EPD_7IN3E_HEIGHT; y++)
-    {
-        for (int x = 0; x < EPD_7IN3E_WIDTH; x += 2)
+        for (int x = 0; x < _width; x += 2)
         {
             auto p1 = lambda(x + 0, y);
             auto p2 = lambda(x + 1, y);
             buffer[x / 2] = (p1 << 4) | (p2 << 0);
         }
-        EPD_7IN3E_SendData(buffer, EPD_7IN3E_WIDTH / 2);
+        sendData(buffer, _width / 2);
     }
 
-    EPD_7IN3E_TurnOnDisplay();
+    turnOnDisplay();
 }
 
 /******************************************************************************
 function :  Enter sleep mode
 parameter:
 ******************************************************************************/
-void EPD_7IN3E_Sleep(void)
+void EPD_7in3e::sleep(void)
 {
-    EPD_7IN3E_SendCommand(0X02); // DEEP_SLEEP
-    EPD_7IN3E_SendData(0x00);
-    EPD_7IN3E_ReadBusyH();
+    sendCommand(0X02); // DEEP_SLEEP
+    sendData(0x00);
+    readBusyH();
 
-    EPD_7IN3E_SendCommand(0x07); // DEEP_SLEEP
-    EPD_7IN3E_SendData(0XA5);
+    sendCommand(0x07); // DEEP_SLEEP
+    sendData(0XA5);
 }

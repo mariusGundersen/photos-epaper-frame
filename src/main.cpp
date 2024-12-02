@@ -34,7 +34,7 @@ void setup()
 
   delay(500);
 
-  GFXcanvas16 epd = GFXcanvas16(EPD_7IN3E_WIDTH, EPD_7IN3E_HEIGHT);
+  GFXcanvas16 gfx = GFXcanvas16(EPD_7IN3E_WIDTH, EPD_7IN3E_HEIGHT);
 
   tft.enableDisplay(true);
 
@@ -49,47 +49,44 @@ void setup()
   tft.println("Set...");
   tft.println("Go!");
 
-  // Debug("EPD_7IN3E_test Demo\r\n");
-  if (DEV_Module_Init() != 0)
-  {
-    tft.println("Failed");
-    return;
-  }
+  // SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
+
+  // log_d("EPD_7IN3E_test Demo\r\n");
+  // GPIO_Config();
+  EPD_7in3e epd = EPD_7in3e(A5, A4, A3, A2);
 
   tft.println("Ready");
 
-  // Debug("e-Paper Init and Clear...\r\n");
-  EPD_7IN3E_Init();
-  EPD_7IN3E_Clear(EPD_7IN3E_WHITE); // WHITE
-  DEV_Delay_ms(1000);
+  // log_d("e-Paper Init and Clear...\r\n");
+  epd.init();
+  epd.clear(EPD_7IN3E_WHITE);
+  delay(1000);
   tft.println("Checking size");
 
-  // Debug("Shown white, now drawing\n");
+  // log_d("Shown white, now drawing\n");
 
-  EPD_7IN3E_Show7Block();
+  // log_d("Shown 7 blocks, now drawing\r\n");
+  tft.printf("Buffer is at %d", gfx.getBuffer());
 
-  // Debug("Shown 7 blocks, now drawing\r\n");
-  tft.printf("Buffer is at %d", epd.getBuffer());
-
-  Serial.printf("Size of buffer %d", epd.getBuffer());
+  Serial.printf("Size of buffer %d", gfx.getBuffer());
 
   tft.println("Drawing in black");
-  DEV_Delay_ms(1000);
+  delay(1000);
 
-  epd.fillScreen(EPD_7IN3E_BLACK);
-  epd.fillRect(0, 0, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_BLACK); // this line causes it to crash. why?
-  epd.fillRect(133, 0, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_BLUE);
-  epd.fillRect(266, 0, 134, EPD_7IN3E_HEIGHT, EPD_7IN3E_RED);
-  epd.fillRect(400, 0, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_GREEN);
-  epd.fillRect(533, 0, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_YELLOW);
-  epd.fillRect(666, 0, 134, EPD_7IN3E_HEIGHT, EPD_7IN3E_WHITE);
+  gfx.fillScreen(EPD_7IN3E_BLACK);
+  gfx.fillRect(0, 0, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_BLACK); // this line causes it to crash. why?
+  gfx.fillRect(133, 0, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_BLUE);
+  gfx.fillRect(266, 0, 134, EPD_7IN3E_HEIGHT, EPD_7IN3E_RED);
+  gfx.fillRect(400, 0, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_GREEN);
+  gfx.fillRect(533, 0, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_YELLOW);
+  gfx.fillRect(666, 0, 134, EPD_7IN3E_HEIGHT, EPD_7IN3E_WHITE);
 
-  draw([&](int x, int y)
-       { return epd.getPixel(x, y); });
+  epd.draw([&](int x, int y)
+           { return gfx.getPixel(x, y); });
 
   // EPD_7IN3E_Show7Block();
 
-  EPD_7IN3E_Sleep();
+  epd.sleep();
 
   // SPI.endTransaction();
 

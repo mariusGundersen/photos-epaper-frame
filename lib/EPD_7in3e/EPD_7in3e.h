@@ -31,8 +31,7 @@
 #ifndef __EPD_7IN3E_H_
 #define __EPD_7IN3E_H_
 
-#include "../Config/Debug.h"
-#include "../Config/DEV_Config.h"
+#include <Arduino.h>
 
 // Display resolution
 #define EPD_7IN3E_WIDTH 800
@@ -49,14 +48,28 @@ Color Index
 #define EPD_7IN3E_BLUE 0x5  /// 101
 #define EPD_7IN3E_GREEN 0x6 /// 110
 
-void EPD_7IN3E_Init(void);
-void EPD_7IN3E_Init_Fast(void);
-void EPD_7IN3E_Clear(UBYTE color);
-void EPD_7IN3E_Show7Block(void);
-void EPD_7IN3E_Show(void);
-void EPD_7IN3E_Display(UBYTE *Image);
-void EPD_7IN3E_DisplayPart(const UBYTE *Image, UWORD xstart, UWORD ystart, UWORD image_width, UWORD image_heigh);
-void draw(std::function<uint8_t(int, int)> lambda);
-void EPD_7IN3E_Sleep(void);
+class EPD_7in3e
+{
+    uint8_t _cs;
+    uint8_t _dc;
+    uint8_t _busy;
+    uint8_t _reset;
+    uint16_t _width = 800;
+    uint16_t _height = 480;
+
+    void reset(void);
+    void sendCommand(uint8_t Reg);
+    void sendData(uint8_t Data);
+    void sendData(uint8_t *pData, uint32_t len);
+    void readBusyH(void);
+    void turnOnDisplay(void);
+
+public:
+    EPD_7in3e(uint8_t cs, uint8_t dc, uint8_t busy, uint8_t reset);
+    void init();
+    void clear(uint8_t color);
+    void draw(std::function<uint8_t(int, int)> lambda);
+    void sleep(void);
+};
 
 #endif
