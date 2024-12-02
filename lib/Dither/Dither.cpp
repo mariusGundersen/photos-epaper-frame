@@ -66,30 +66,90 @@ uint8_t FloydSteinberg::find_closest_palette_color(uint16_t pixel)
 
 uint8_t FloydSteinberg::find_closest_palette_color(uint16_t pixel, int *errors)
 {
-    int smallest_diff = 0xffffff;
-    uint8_t best = 0;
     RGB sample = RGB(pixel);
-    // Serial.printf("pixel %x, %x,%x,%x\n", pixel, sample[0], sample[1], sample[2]);
-    for (int i = 0; i < this->palette_size; i++)
+
+    if (sample.r < 0xf)
     {
-        RGB option = this->palette[i];
-        // Serial.printf("sample %x, %x,%x,%x\n", this->palette[i], option[0], option[1], option[2]);
-        int e0 = sample.r - option.r;
-        int e1 = sample.g - option.g;
-        int e2 = sample.b - option.b;
-        int diff = abs(e0) + abs(e1) / 2 + abs(e2);
-        // Serial.printf("test %d, diff=%d, e: %d %d %d\n", i, diff, e0, e1, e2);
-        if (diff < smallest_diff)
+        if (sample.g < 0x1f)
         {
-            smallest_diff = diff;
-            best = i;
-            errors[0] = e0;
-            errors[1] = e1;
-            errors[2] = e2;
+            if (sample.b < 0xf)
+            {
+                // black
+                errors[0] = sample.r;
+                errors[1] = sample.g;
+                errors[2] = sample.b;
+                return 0;
+            }
+            else
+            {
+                // blue
+                errors[0] = sample.r;
+                errors[1] = sample.g;
+                errors[2] = sample.b - 0x1f;
+                return 4;
+            }
+        }
+        else
+        {
+            if (sample.b < 0xf)
+            {
+                // green
+                errors[0] = sample.r;
+                errors[1] = sample.g - 0x3f;
+                errors[2] = sample.b;
+                return 5;
+            }
+            else
+            {
+                // cyan, pick the highest of blue and green
+                errors[0] = sample.r;
+                errors[1] = sample.g - (sample.g > sample.b ? 0x3f : 0);
+                errors[2] = sample.b - (sample.g > sample.b ? 0 : 0x1f);
+                return sample.g > sample.b ? 5 : 4;
+            }
         }
     }
-
-    return best;
+    else
+    {
+        if (sample.g < 0x1f)
+        {
+            if (sample.b < 0xf)
+            {
+                // red
+                errors[0] = sample.r - 0x1f;
+                errors[1] = sample.g;
+                errors[2] = sample.b;
+                return 3;
+            }
+            else
+            {
+                // magenta, pick the highest of red and blue
+                errors[0] = sample.r - (sample.r > sample.b ? 0x1f : 0);
+                errors[1] = sample.g;
+                errors[2] = sample.b - (sample.r > sample.b ? 0 : 0x1f);
+                return sample.r > sample.b ? 3 : 4;
+            }
+        }
+        else
+        {
+            if (sample.b < 0xf)
+            {
+                // yellow
+                errors[0] = sample.r - 0x1f;
+                errors[1] = sample.g - 0x3f;
+                errors[2] = sample.b;
+                return 2;
+            }
+            else
+            {
+                // white
+                errors[0] = sample.r - 0x1f;
+                errors[1] = sample.g - 0x3f;
+                errors[2] = sample.b - 0x1f;
+                return 1;
+            }
+        }
+    }
 }
 
 int clamp(int value, int min, int max)

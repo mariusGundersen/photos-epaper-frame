@@ -24,6 +24,12 @@ struct RGB
         g = (pixel >> 5) & 0b111111;
         b = (pixel >> 0) & 0b11111;
     }
+    RGB(uint8_t r, uint8_t g, uint8_t b)
+    {
+        this->r = clamp(r, 0, 0x1f);
+        this->g = clamp(g, 0, 0x3f);
+        this->b = clamp(b, 0, 0x1f);
+    }
     uint8_t r;
     uint8_t g;
     uint8_t b;

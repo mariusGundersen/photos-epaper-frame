@@ -73,18 +73,41 @@ void setup()
   tft.println("Drawing in black");
   delay(1000);
 
-  gfx.fillScreen(EPD_7IN3E_BLACK);
-  gfx.fillRect(0, 0, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_BLACK); // this line causes it to crash. why?
-  gfx.fillRect(133, 0, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_BLUE);
-  gfx.fillRect(266, 0, 134, EPD_7IN3E_HEIGHT, EPD_7IN3E_RED);
-  gfx.fillRect(400, 0, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_GREEN);
-  gfx.fillRect(533, 0, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_YELLOW);
-  gfx.fillRect(666, 0, 134, EPD_7IN3E_HEIGHT, EPD_7IN3E_WHITE);
+  gfx.fillScreen(ST77XX_BLACK);
+  gfx.fillRect(0, 0, 133, EPD_7IN3E_HEIGHT, ST77XX_BLACK);
+  gfx.fillRect(133, 0, 133, EPD_7IN3E_HEIGHT / 2, ST77XX_BLUE);
+  gfx.fillRect(133, EPD_7IN3E_HEIGHT / 2, 133, EPD_7IN3E_HEIGHT / 2, ST77XX_CYAN);
+  gfx.fillRect(266, 0, 134, EPD_7IN3E_HEIGHT / 2, ST77XX_RED);
+  gfx.fillRect(266, EPD_7IN3E_HEIGHT / 2, 134, EPD_7IN3E_HEIGHT / 2, ST77XX_MAGENTA);
+  gfx.fillRect(400, 0, 133, EPD_7IN3E_HEIGHT, ST77XX_GREEN);
+  gfx.fillRect(533, 0, 133, EPD_7IN3E_HEIGHT, ST77XX_YELLOW);
+  gfx.fillRect(666, 0, 134, EPD_7IN3E_HEIGHT, ST77XX_WHITE);
+
+  floydSteinberg.dither(EPD_7IN3E_WIDTH, EPD_7IN3E_HEIGHT, gfx.getBuffer());
 
   epd.draw([&](int x, int y)
            { return gfx.getPixel(x, y); });
 
-  // EPD_7IN3E_Show7Block();
+  epd.sleep();
+
+  delay(5000);
+
+  epd.init();
+
+  gfx.fillScreen(RGB(0, 0xff, 0xff));
+
+  /* for (int y = 0; y < EPD_7IN3E_HEIGHT; y++)
+  {
+    for (int x = 0; x < EPD_7IN3E_WIDTH; x++)
+    {
+      gfx.writePixel(x, y, RGB(x * 0x1f / EPD_7IN3E_WIDTH, y * 0x3f / EPD_7IN3E_HEIGHT, 0xf));
+    }
+  }
+ */
+  floydSteinberg.dither(EPD_7IN3E_WIDTH, EPD_7IN3E_HEIGHT, gfx.getBuffer());
+
+  epd.draw([&](int x, int y)
+           { return gfx.getPixel(x, y); });
 
   epd.sleep();
 
