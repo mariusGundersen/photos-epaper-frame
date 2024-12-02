@@ -63,11 +63,11 @@ UBYTE DEV_Module_Init(void)
     GPIO_Config();
 
     // serial printf
-    Serial.begin(115200);
+    // Serial.begin(115200);
 
     // spi
-    SPI.begin();
-    SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
+    // SPI.begin();
+    // SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
 
     return 0;
 }

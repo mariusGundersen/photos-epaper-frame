@@ -6,7 +6,7 @@
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, -1);
 uint8_t x = 0;
 uint16_t rgb = 0;
-GFXcanvas16 epd = GFXcanvas16(EPD_7IN3E_WIDTH, EPD_7IN3E_HEIGHT);
+// GFXcanvas16 epd; // EPD_7IN3E_WIDTH, EPD_7IN3E_HEIGHT);
 
 RGB palette[6] = {
     ST77XX_BLACK,  // black
@@ -34,46 +34,66 @@ void setup()
 
   delay(500);
 
+  GFXcanvas16 epd = GFXcanvas16(EPD_7IN3E_WIDTH, EPD_7IN3E_HEIGHT);
+
   tft.enableDisplay(true);
 
   tft.fillRect(0, 0, 135, 240, ST77XX_BLUE);
 
   Serial.println(("TFT INIT"));
 
-  tft.drawLine(70, 0, 70, 239, ST77XX_GREEN);
+  // tft.drawLine(70, 0, 70, 239, ST77XX_GREEN);
+  tft.setTextColor(ST77XX_WHITE);
+  tft.setCursor(10, 0);
+  tft.println("Ready!");
+  tft.println("Set...");
+  tft.println("Go!");
 
-  Debug("EPD_7IN3E_test Demo\r\n");
+  // Debug("EPD_7IN3E_test Demo\r\n");
   if (DEV_Module_Init() != 0)
   {
+    tft.println("Failed");
     return;
   }
 
-  Debug("e-Paper Init and Clear...\r\n");
+  tft.println("Ready");
+
+  // Debug("e-Paper Init and Clear...\r\n");
   EPD_7IN3E_Init();
   EPD_7IN3E_Clear(EPD_7IN3E_WHITE); // WHITE
   DEV_Delay_ms(1000);
+  tft.println("Checking size");
+
+  // Debug("Shown white, now drawing\n");
+
+  EPD_7IN3E_Show7Block();
+
+  // Debug("Shown 7 blocks, now drawing\r\n");
+  tft.printf("Buffer is at %d", epd.getBuffer());
+
+  Serial.printf("Size of buffer %d", epd.getBuffer());
+
+  tft.println("Drawing in black");
+  DEV_Delay_ms(1000);
 
   epd.fillScreen(EPD_7IN3E_BLACK);
-  epd.fillRect(0, 0, 133, 200, EPD_7IN3E_BLACK); // this line causes it to crash. why?
-
-  // epd.fillRect(0, 133, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_BLUE);
-  /*
-  epd.drawRect(0, 266, 134, EPD_7IN3E_HEIGHT, EPD_7IN3E_RED);
-  epd.drawRect(0, 400, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_GREEN);
-  epd.drawRect(0, 533, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_YELLOW);
-  epd.drawRect(0, 666, 134, EPD_7IN3E_HEIGHT, EPD_7IN3E_WHITE);
+  epd.fillRect(0, 0, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_BLACK); // this line causes it to crash. why?
+  epd.fillRect(133, 0, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_BLUE);
+  epd.fillRect(266, 0, 134, EPD_7IN3E_HEIGHT, EPD_7IN3E_RED);
+  epd.fillRect(400, 0, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_GREEN);
+  epd.fillRect(533, 0, 133, EPD_7IN3E_HEIGHT, EPD_7IN3E_YELLOW);
+  epd.fillRect(666, 0, 134, EPD_7IN3E_HEIGHT, EPD_7IN3E_WHITE);
 
   draw([&](int x, int y)
        { return epd.getPixel(x, y); });
 
   // EPD_7IN3E_Show7Block();
-  */
 
   EPD_7IN3E_Sleep();
 
-  SPI.endTransaction();
+  // SPI.endTransaction();
 
-  tft.enableDisplay(true);
+  // tft.enableDisplay(true);
 }
 
 void loop()
