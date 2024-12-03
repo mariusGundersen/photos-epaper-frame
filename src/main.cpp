@@ -6,6 +6,7 @@
 #include <Fonts/FreeSans24pt7b.h>
 #include <Fonts/FreeSans12pt7b.h>
 #include <Epaper.h>
+#include <GithubUpdate.h>
 
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, -1);
 uint8_t x = 0;
@@ -55,12 +56,6 @@ void wifiScreen(Epaper &gfx, const char *ssid, const char *password)
   gfx.printCentredText(buffer, gfx.width() / 2, top + qrcodeSize + h + 10, false);
 
   gfx.updateDisplay();
-
-  WiFi.mode(WIFI_STA);
-  WiFiManager wm;
-  wm.setConnectTimeout(0);
-  // wm.setConfigPortalTimeout(60);
-  wm.autoConnect(ssid, password);
 }
 
 void setClock()
@@ -119,11 +114,40 @@ void setup()
 
   ////////////////////////////////////////
 
-  wifiScreen(gfx, "bilderamme", "password");
+  WiFi.mode(WIFI_STA);
+  WiFiManager wm;
+  // wm.resetSettings();
+  wm.setConnectTimeout(0);
+  wm.setEnableConfigPortal(false);
+  if (!wm.autoConnect("bilderamme", "password"))
+  {
+    pinMode(GPIO_NUM_0, INPUT_PULLUP);
+    gfx.fillScreen(EPD_7IN3E_WHITE);
+    gfx.setFont(&FreeSans24pt7b);
+    gfx.setTextColor(EPD_7IN3E_BLACK);
+    gfx.printCentredText("Trykk på knappen for å koble til wifi", gfx.width() / 2, gfx.height() / 2);
+    gfx.updateDisplay();
+
+    while (digitalRead(GPIO_NUM_0) == HIGH)
+    {
+      delay(100);
+    }
+
+    wm.setConfigPortalTimeout(120);
+    wm.setEnableConfigPortal(true);
+    wm.setCaptivePortalEnable(true);
+    wm.setAPCallback([&](WiFiManager *wm)
+                     { wifiScreen(gfx, "bilderamme", "password"); });
+    wm.autoConnect("bilderamme", "password");
+  }
 
   tft.println("Wifi connected");
 
   setClock();
+
+  GithubUpdate *updater = new GithubUpdate();
+
+  updater->update("mariusGundersen", "photos-epaper-frame", "firmware.bin");
 
   // log_d("e-Paper Init and Clear...\r\n");
   delay(1000);

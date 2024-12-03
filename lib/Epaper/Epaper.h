@@ -8,6 +8,7 @@
 
 class Epaper : public GFXcanvas16
 {
+private:
     EPD_7in3e _epd;
     FloydSteinberg _dither;
 
