@@ -63,6 +63,27 @@ void wifiScreen(Epaper &gfx, const char *ssid, const char *password)
   wm.autoConnect(ssid, password);
 }
 
+void setClock()
+{
+  configTime(0, 0, "pool.ntp.org");
+
+  Serial.print(F("Waiting for NTP time sync: "));
+  time_t nowSecs = time(nullptr);
+  while (nowSecs < 8 * 3600 * 2)
+  {
+    delay(500);
+    Serial.print(F("."));
+    yield();
+    nowSecs = time(nullptr);
+  }
+
+  Serial.println();
+  struct tm timeinfo;
+  gmtime_r(&nowSecs, &timeinfo);
+  Serial.print(F("Current time: "));
+  Serial.print(asctime(&timeinfo));
+}
+
 void setup()
 {
   Serial.begin();
@@ -100,7 +121,9 @@ void setup()
 
   wifiScreen(gfx, "bilderamme", "password");
 
-  tft.println("Ready");
+  tft.println("Wifi connected");
+
+  setClock();
 
   // log_d("e-Paper Init and Clear...\r\n");
   delay(1000);
@@ -142,13 +165,20 @@ void setup()
     }
   }
  */
-  gfx.dither();
-
-  gfx.updateDisplay();
 
   // SPI.endTransaction();
 
   // tft.enableDisplay(true);
+
+  gfx.fillScreen(EPD_7IN3E_WHITE);
+  gfx.setFont(&FreeSans24pt7b);
+
+  time_t nowSecs = time(nullptr);
+  struct tm timeinfo;
+  gmtime_r(&nowSecs, &timeinfo);
+
+  gfx.printCentredText(asctime(&timeinfo), gfx.width() / 2, gfx.height() / 2);
+  gfx.updateDisplay();
 }
 
 void loop()
