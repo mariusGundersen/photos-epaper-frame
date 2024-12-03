@@ -54,8 +54,8 @@ class EPD_7in3e
     uint8_t _dc;
     uint8_t _busy;
     uint8_t _reset;
-    uint16_t _width = 800;
-    uint16_t _height = 480;
+    uint16_t _width;
+    uint16_t _height;
 
     void reset(void);
     void sendCommand(uint8_t Reg);
@@ -65,7 +65,7 @@ class EPD_7in3e
     void turnOnDisplay(void);
 
 public:
-    EPD_7in3e(uint8_t cs, uint8_t dc, uint8_t busy, uint8_t reset);
+    EPD_7in3e(uint8_t cs, uint8_t dc, uint8_t busy, uint8_t reset, uint16_t width, uint16_t height);
     void init();
     void clear(uint8_t color);
     void draw(std::function<uint8_t(int, int)> lambda);

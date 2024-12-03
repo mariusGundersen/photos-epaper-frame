@@ -98,12 +98,13 @@ void EPD_7in3e::readBusyH(void)
     log_d("e-Paper busy H release\r\n");
 }
 
-EPD_7in3e::EPD_7in3e(uint8_t cs, uint8_t dc, uint8_t busy, uint8_t reset)
+EPD_7in3e::EPD_7in3e(uint8_t cs, uint8_t dc, uint8_t busy, uint8_t reset, uint16_t width, uint16_t height) : _cs(cs),
+                                                                                                             _dc(dc),
+                                                                                                             _busy(busy),
+                                                                                                             _reset(reset),
+                                                                                                             _width(width),
+                                                                                                             _height(height)
 {
-    _cs = cs;
-    _dc = dc;
-    _busy = busy;
-    _reset = reset;
 }
 
 /******************************************************************************
