@@ -121,7 +121,8 @@ void setup()
 
   WiFi.mode(WIFI_STA);
   WiFiManager wm;
-  wm.resetSettings();
+
+  // wm.resetSettings();
 
   if (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER)
   {
