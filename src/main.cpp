@@ -177,16 +177,19 @@ void setup()
   tft.println("Drawing in black");
   delay(1000);
 
-  gfx.fillScreen(ST77XX_BLACK);
-  gfx.fillRect(0, 0, 133, EPD_7IN3E_HEIGHT, ST77XX_BLACK);
-  gfx.fillRect(133, 0, 133, EPD_7IN3E_HEIGHT / 2, ST77XX_BLUE);
-  gfx.fillRect(133, EPD_7IN3E_HEIGHT / 2, 133, EPD_7IN3E_HEIGHT / 2, ST77XX_CYAN);
-  gfx.fillRect(266, 0, 134, EPD_7IN3E_HEIGHT / 2, ST77XX_RED);
-  gfx.fillRect(266, EPD_7IN3E_HEIGHT / 2, 134, EPD_7IN3E_HEIGHT / 2, ST77XX_MAGENTA);
-  gfx.fillRect(400, 0, 133, EPD_7IN3E_HEIGHT, ST77XX_GREEN);
-  gfx.fillRect(533, 0, 133, EPD_7IN3E_HEIGHT, ST77XX_YELLOW);
-  gfx.fillRect(666, 0, 134, EPD_7IN3E_HEIGHT, ST77XX_WHITE);
+  /*
+    gfx.fillScreen(ST77XX_BLACK);
+    gfx.fillRect(0, 0, 133, EPD_7IN3E_HEIGHT, ST77XX_BLACK);
+    gfx.fillRect(133, 0, 133, EPD_7IN3E_HEIGHT / 2, ST77XX_BLUE);
+    gfx.fillRect(133, EPD_7IN3E_HEIGHT / 2, 133, EPD_7IN3E_HEIGHT / 2, ST77XX_CYAN);
+    gfx.fillRect(266, 0, 134, EPD_7IN3E_HEIGHT / 2, ST77XX_RED);
+    gfx.fillRect(266, EPD_7IN3E_HEIGHT / 2, 134, EPD_7IN3E_HEIGHT / 2, ST77XX_MAGENTA);
+    gfx.fillRect(400, 0, 133, EPD_7IN3E_HEIGHT, ST77XX_GREEN);
+    gfx.fillRect(533, 0, 133, EPD_7IN3E_HEIGHT, ST77XX_YELLOW);
+    gfx.fillRect(666, 0, 134, EPD_7IN3E_HEIGHT, ST77XX_WHITE);
+    */
 
+  gfx.fillScreen(ST77XX_MAGENTA);
   gfx.dither();
 
   gfx.updateDisplay();
@@ -207,7 +210,12 @@ void setup()
   gfx.printCentredText(timeStr, gfx.width() / 2, gfx.height() / 2);
   gfx.updateDisplay();
 
-  int secondsUntilNextHour = (59 - timeinfo.tm_min) * 60 + (60 - timeinfo.tm_sec);
+  int minutesUntilNextHour = 59 - timeinfo.tm_min;
+  if (minutesUntilNextHour < 5)
+  {
+    minutesUntilNextHour += 60;
+  }
+  int secondsUntilNextHour = minutesUntilNextHour * 60 + (60 - timeinfo.tm_sec);
 
   esp_sleep_enable_timer_wakeup(secondsUntilNextHour * uS_TO_S_FACTOR);
   log_d("Setup ESP32 to sleep for %d Seconds\n", secondsUntilNextHour);
