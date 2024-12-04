@@ -63,6 +63,8 @@ void wifiScreen(Epaper &gfx, const char *ssid, const char *password)
 void setClock()
 {
   configTime(0, 0, "pool.ntp.org");
+  setenv("TZ", "CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00", 1);
+  tzset();
 
   Serial.print(F("Waiting for NTP time sync: "));
   time_t nowSecs = time(nullptr);
@@ -198,7 +200,7 @@ void setup()
 
   // gfx.fillScreen(EPD_7IN3E_WHITE);
   gfx.setFont(&FreeSans24pt7b);
-  gfx.setTextColor(EPD_7IN3E_BLACK);
+  gfx.setTextColor(EPD_7IN3E_YELLOW);
 
   time_t nowSecs = time(nullptr);
   struct tm timeinfo;
