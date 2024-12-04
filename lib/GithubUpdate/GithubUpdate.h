@@ -4,13 +4,13 @@
 #include <Arduino.h>
 #include <Update.h>
 #include <HTTPClient.h>
-#include <WifiClientSecure.h>
+#include <NetworkClientSecure.h>
 #include <Preferences.h>
 
 class GithubUpdate
 {
 protected:
-    WiFiClientSecure _client;
+    NetworkClientSecure _client;
     HTTPClient _https;
     Preferences _prefs;
 
