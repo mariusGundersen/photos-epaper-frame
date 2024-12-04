@@ -109,6 +109,7 @@ void setup()
 
   // SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
   Epaper gfx = Epaper(A5, A4, A3, A2);
+  gfx.setRotation(2); // rotate upside down
 
   tft.println("Go!");
 
@@ -179,29 +180,18 @@ void setup()
 
   delay(5000);
 
-  gfx.fillScreen(RGB(0, 0xff, 0xff));
-
-  /* for (int y = 0; y < EPD_7IN3E_HEIGHT; y++)
-  {
-    for (int x = 0; x < EPD_7IN3E_WIDTH; x++)
-    {
-      gfx.writePixel(x, y, RGB(x * 0x1f / EPD_7IN3E_WIDTH, y * 0x3f / EPD_7IN3E_HEIGHT, 0xf));
-    }
-  }
- */
-
-  // SPI.endTransaction();
-
-  // tft.enableDisplay(true);
-
-  gfx.fillScreen(EPD_7IN3E_WHITE);
+  // gfx.fillScreen(EPD_7IN3E_WHITE);
   gfx.setFont(&FreeSans24pt7b);
+  gfx.setTextColor(EPD_7IN3E_BLACK);
 
   time_t nowSecs = time(nullptr);
   struct tm timeinfo;
   gmtime_r(&nowSecs, &timeinfo);
 
-  gfx.printCentredText(asctime(&timeinfo), gfx.width() / 2, gfx.height() / 2);
+  char *timeStr = asctime(&timeinfo);
+  Serial.println(timeStr);
+
+  gfx.printCentredText(timeStr, gfx.width() / 2, gfx.height() / 2);
   gfx.updateDisplay();
 }
 

@@ -21,6 +21,7 @@ Epaper::~Epaper() {}
 void Epaper::updateDisplay()
 {
     _epd.init();
+    _epd.clear(EPD_7IN3E_WHITE);
     _epd.draw([&](int x, int y)
               { return getPixel(x, y); });
     _epd.sleep();

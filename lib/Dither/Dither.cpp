@@ -25,7 +25,7 @@ void FloydSteinberg::dither(const int w, const int h, uint16_t *pixels)
         for (int x = 0; x < w; x++)
         {
             uint16_t oldpixel = pixels[row + x];
-            uint16_t newpixel = this->find_closest_palette_color(oldpixel, errors);
+            uint16_t newpixel = this->find_closest_palette_color(oldpixel, errors, y + x);
             pixels[row + x] = newpixel;
             if (x + 1 < w)
             {
@@ -58,21 +58,21 @@ void FloydSteinberg::dither(const int w, const int h, uint16_t *pixels)
 
 */
 
-uint8_t FloydSteinberg::find_closest_palette_color(uint16_t pixel)
+uint16_t FloydSteinberg::find_closest_palette_color(uint16_t pixel)
 {
     int errors[3];
-    return this->find_closest_palette_color(pixel, errors);
+    return this->find_closest_palette_color(pixel, errors, 0);
 }
 
-uint8_t FloydSteinberg::find_closest_palette_color(uint16_t pixel, int *errors)
+uint16_t FloydSteinberg::find_closest_palette_color(uint16_t pixel, int *errors, int evenOdd)
 {
     RGB sample = RGB(pixel);
 
-    if (sample.r < 0xf)
+    if (sample.r < RGB_RED_HALF)
     {
-        if (sample.g < 0x1f)
+        if (sample.g < RGB_GREEN_HALF)
         {
-            if (sample.b < 0xf)
+            if (sample.b < RGB_BLUE_HALF)
             {
                 // black
                 errors[0] = sample.r;
@@ -85,38 +85,39 @@ uint8_t FloydSteinberg::find_closest_palette_color(uint16_t pixel, int *errors)
                 // blue
                 errors[0] = sample.r;
                 errors[1] = sample.g;
-                errors[2] = sample.b - 0x1f;
-                return 4;
+                errors[2] = sample.b - RGB_BLUE_FULL;
+                return 5;
             }
         }
         else
         {
-            if (sample.b < 0xf)
+            if (sample.b < RGB_BLUE_HALF)
             {
                 // green
                 errors[0] = sample.r;
-                errors[1] = sample.g - 0x3f;
+                errors[1] = sample.g - RGB_GREEN_FULL;
                 errors[2] = sample.b;
-                return 5;
+                return 6;
             }
             else
             {
                 // cyan, pick the highest of blue and green
+                bool greenish = (evenOdd & 1) ? (sample.g >> 1) > sample.b : (sample.g >> 1) >= sample.b;
                 errors[0] = sample.r;
-                errors[1] = sample.g - (sample.g > sample.b ? 0x3f : 0);
-                errors[2] = sample.b - (sample.g > sample.b ? 0 : 0x1f);
-                return sample.g > sample.b ? 5 : 4;
+                errors[1] = sample.g - (greenish ? RGB_GREEN_FULL : 0);
+                errors[2] = sample.b - (greenish ? 0 : RGB_BLUE_FULL);
+                return greenish ? 6 : 5;
             }
         }
     }
     else
     {
-        if (sample.g < 0x1f)
+        if (sample.g < RGB_GREEN_HALF)
         {
-            if (sample.b < 0xf)
+            if (sample.b < RGB_BLUE_HALF)
             {
                 // red
-                errors[0] = sample.r - 0x1f;
+                errors[0] = sample.r - RGB_RED_FULL;
                 errors[1] = sample.g;
                 errors[2] = sample.b;
                 return 3;
@@ -124,28 +125,29 @@ uint8_t FloydSteinberg::find_closest_palette_color(uint16_t pixel, int *errors)
             else
             {
                 // magenta, pick the highest of red and blue
-                errors[0] = sample.r - (sample.r > sample.b ? 0x1f : 0);
+                bool redish = (evenOdd & 1) ? sample.r > sample.b : sample.r >= sample.b;
+                errors[0] = sample.r - (redish ? RGB_RED_FULL : 0);
                 errors[1] = sample.g;
-                errors[2] = sample.b - (sample.r > sample.b ? 0 : 0x1f);
-                return sample.r > sample.b ? 3 : 4;
+                errors[2] = sample.b - (redish ? 0 : RGB_BLUE_FULL);
+                return redish ? 3 : 5;
             }
         }
         else
         {
-            if (sample.b < 0xf)
+            if (sample.b < RGB_BLUE_HALF)
             {
                 // yellow
-                errors[0] = sample.r - 0x1f;
-                errors[1] = sample.g - 0x3f;
+                errors[0] = sample.r - RGB_RED_FULL;
+                errors[1] = sample.g - RGB_GREEN_FULL;
                 errors[2] = sample.b;
                 return 2;
             }
             else
             {
                 // white
-                errors[0] = sample.r - 0x1f;
-                errors[1] = sample.g - 0x3f;
-                errors[2] = sample.b - 0x1f;
+                errors[0] = sample.r - RGB_RED_FULL;
+                errors[1] = sample.g - RGB_GREEN_FULL;
+                errors[2] = sample.b - RGB_BLUE_FULL;
                 return 1;
             }
         }
