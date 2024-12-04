@@ -8,6 +8,8 @@
 #include <Epaper.h>
 #include <GithubUpdate.h>
 
+#define uS_TO_S_FACTOR 1000000ULL /* Conversion factor for micro seconds to seconds */
+
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, -1);
 uint8_t x = 0;
 uint16_t rgb = 0;
@@ -81,6 +83,8 @@ void setClock()
 
 void setup()
 {
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+
   Serial.begin();
   delay(1000);
   Serial.println("Started");
@@ -117,29 +121,45 @@ void setup()
 
   WiFi.mode(WIFI_STA);
   WiFiManager wm;
-  // wm.resetSettings();
-  wm.setConnectTimeout(0);
-  wm.setEnableConfigPortal(false);
+  wm.resetSettings();
+
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER)
+  {
+    // try to connect, if fails, show message screen and go back to sleep
+    wm.setConnectTimeout(0);
+    wm.setEnableConfigPortal(false);
+  }
+  else
+  {
+    // try to connect, if fails, show config portal for 2 minutes, then show message screen and go back to sleep
+    wm.setConfigPortalTimeout(120);
+    wm.setEnableConfigPortal(true);
+    wm.setCaptivePortalEnable(true);
+    wm.setAPCallback([&](WiFiManager *wm)
+                     { wifiScreen(gfx, "bilderamme", "password"); });
+    // TODO: show different qrcode when a client has connected
+
+    wm.setSaveConfigCallback([&]()
+                             {      
+      gfx.fillScreen(EPD_7IN3E_WHITE);
+      gfx.setFont(&FreeSans24pt7b);
+      gfx.setTextColor(EPD_7IN3E_BLACK);
+      gfx.printCentredText("Koblet til WiFi", gfx.width()/2, gfx.height()/2);
+      gfx.updateDisplay(); });
+  }
+
   if (!wm.autoConnect("bilderamme", "password"))
   {
-    pinMode(GPIO_NUM_0, INPUT_PULLUP);
     gfx.fillScreen(EPD_7IN3E_WHITE);
     gfx.setFont(&FreeSans24pt7b);
     gfx.setTextColor(EPD_7IN3E_BLACK);
     gfx.printCentredText("Trykk på knappen for å koble til wifi", gfx.width() / 2, gfx.height() / 2);
     gfx.updateDisplay();
 
-    while (digitalRead(GPIO_NUM_0) == HIGH)
-    {
-      delay(100);
-    }
+    // TODO: set up trigger on GPIO0
 
-    wm.setConfigPortalTimeout(120);
-    wm.setEnableConfigPortal(true);
-    wm.setCaptivePortalEnable(true);
-    wm.setAPCallback([&](WiFiManager *wm)
-                     { wifiScreen(gfx, "bilderamme", "password"); });
-    wm.autoConnect("bilderamme", "password");
+    // now sleep...
+    esp_deep_sleep_start();
   }
 
   tft.println("Wifi connected");
@@ -152,14 +172,6 @@ void setup()
 
   // log_d("e-Paper Init and Clear...\r\n");
   delay(1000);
-  tft.println("Checking size");
-
-  // log_d("Shown white, now drawing\n");
-
-  // log_d("Shown 7 blocks, now drawing\r\n");
-  tft.printf("Buffer is at %d", gfx.getBuffer());
-
-  Serial.printf("Size of buffer %d", gfx.getBuffer());
 
   tft.println("Drawing in black");
   delay(1000);
@@ -193,6 +205,19 @@ void setup()
 
   gfx.printCentredText(timeStr, gfx.width() / 2, gfx.height() / 2);
   gfx.updateDisplay();
+
+  int secondsUntilNextHour = (59 - timeinfo.tm_min) * 60 + (60 - timeinfo.tm_sec);
+
+  esp_sleep_enable_timer_wakeup(secondsUntilNextHour * uS_TO_S_FACTOR);
+  log_d("Setup ESP32 to sleep for %d Seconds\n", secondsUntilNextHour);
+
+  // esp_sleep_enable_ext1_wakeup(1 << D2, ESP_EXT1_WAKEUP_ALL_LOW);
+
+  log_d("Going to sleep now\n");
+  if (Serial)
+    Serial.flush();
+
+  esp_deep_sleep_start();
 }
 
 void loop()
