@@ -11,7 +11,7 @@ RGB palette[6] = {
 
 Epaper::Epaper(uint8_t cs, uint8_t dc, uint8_t busy, uint8_t reset, uint16_t width, uint16_t height)
     : GFXcanvas16(width, height),
-      _epd(EPD_7in3e(cs, dc, busy, reset, width, height)),
+      _epd(EPD_7in3e(cs, dc, busy, reset)),
       _dither(FloydSteinberg(6, palette))
 {
 }
@@ -22,8 +22,8 @@ void Epaper::updateDisplay()
 {
     _epd.init();
     //_epd.clear(EPD_7IN3E_WHITE);
-    _epd.draw([&](int x, int y)
-              { return getPixel(x, y); });
+    _epd.draw(_height, _width, [&](int x, int y)
+              { return getPixel(_width - y, x); });
     _epd.sleep();
 }
 

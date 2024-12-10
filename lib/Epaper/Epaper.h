@@ -13,7 +13,7 @@ private:
     FloydSteinberg _dither;
 
 public:
-    Epaper(uint8_t cs, uint8_t dc, uint8_t busy, uint8_t reset, uint16_t width = 800, uint16_t height = 480);
+    Epaper(uint8_t cs, uint8_t dc, uint8_t busy, uint8_t reset, uint16_t width = 480, uint16_t height = 800);
     ~Epaper();
     void updateDisplay();
     void dither();

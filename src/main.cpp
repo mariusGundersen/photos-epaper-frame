@@ -7,6 +7,7 @@
 #include <Fonts/FreeSans12pt7b.h>
 #include <Epaper.h>
 #include <GithubUpdate.h>
+#include <JPEGDEC.h>
 
 #define uS_TO_S_FACTOR 1000000ULL /* Conversion factor for micro seconds to seconds */
 
@@ -14,7 +15,21 @@ Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, -1);
 uint8_t x = 0;
 uint16_t rgb = 0;
 
-void wifiScreen(Epaper &gfx, const char *ssid, const char *password)
+const char *cloudflareRootCACert = "-----BEGIN CERTIFICATE-----\n"
+                                   "MIICCTCCAY6gAwIBAgINAgPlwGjvYxqccpBQUjAKBggqhkjOPQQDAzBHMQswCQYD\n"
+                                   "VQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExMQzEUMBIG\n"
+                                   "A1UEAxMLR1RTIFJvb3QgUjQwHhcNMTYwNjIyMDAwMDAwWhcNMzYwNjIyMDAwMDAw\n"
+                                   "WjBHMQswCQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2Vz\n"
+                                   "IExMQzEUMBIGA1UEAxMLR1RTIFJvb3QgUjQwdjAQBgcqhkjOPQIBBgUrgQQAIgNi\n"
+                                   "AATzdHOnaItgrkO4NcWBMHtLSZ37wWHO5t5GvWvVYRg1rkDdc/eJkTBa6zzuhXyi\n"
+                                   "QHY7qca4R9gq55KRanPpsXI5nymfopjTX15YhmUPoYRlBtHci8nHc8iMai/lxKvR\n"
+                                   "HYqjQjBAMA4GA1UdDwEB/wQEAwIBhjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQW\n"
+                                   "BBSATNbrdP9JNqPV2Py1PsVq8JQdjDAKBggqhkjOPQQDAwNpADBmAjEA6ED/g94D\n"
+                                   "9J+uHXqnLrmvT/aDHQ4thQEd0dlq7A/Cr8deVl5c1RxYIigL9zC2L7F8AjEA8GE8\n"
+                                   "p/SgguMh1YQdc4acLa/KNJvxn7kjNuK8YAOdgLOaVsjh4rsUecrNIdSUtUlD\n"
+                                   "-----END CERTIFICATE-----";
+
+void wifiScreen(Epaper *gfx, const char *ssid, const char *password)
 {
   String text = String("WIFI:T:WPA:S:");
   text.concat(ssid);
@@ -26,21 +41,21 @@ void wifiScreen(Epaper &gfx, const char *ssid, const char *password)
 
   qrcode_initText(&qrcode, qrcodeData, 4, ECC_MEDIUM, text.c_str());
 
-  gfx.fillScreen(EPD_7IN3E_WHITE);
-  gfx.setFont(&FreeSans24pt7b);
-  gfx.setTextColor(EPD_7IN3E_BLACK);
+  gfx->fillScreen(EPD_7IN3E_WHITE);
+  gfx->setFont(&FreeSans24pt7b);
+  gfx->setTextColor(EPD_7IN3E_BLACK);
 
   uint8_t scale = 4;
   uint16_t qrcodeSize = qrcode.size * scale;
-  uint16_t left = (gfx.width() - qrcodeSize) / 2;
-  uint16_t top = (gfx.height() - qrcodeSize) / 2;
-  gfx.printCentredText("Koble til WiFi", gfx.width() / 2, top / 2);
+  uint16_t left = (gfx->width() - qrcodeSize) / 2;
+  uint16_t top = (gfx->height() - qrcodeSize) / 2;
+  gfx->printCentredText("Koble til WiFi", gfx->width() / 2, top / 2);
 
   for (uint8_t y = 0; y < qrcode.size; y++)
   {
     for (uint8_t x = 0; x < qrcode.size; x++)
     {
-      gfx.fillRect(
+      gfx->fillRect(
           left + x * scale,
           top + y * scale,
           scale,
@@ -49,19 +64,20 @@ void wifiScreen(Epaper &gfx, const char *ssid, const char *password)
     }
   }
 
-  gfx.setFont(&FreeSans12pt7b);
+  gfx->setFont(&FreeSans12pt7b);
   char buffer[40];
   sprintf(buffer, "SSID: %s", ssid);
-  uint16_t h = gfx.printCentredText(buffer, gfx.width() / 2, top + qrcodeSize + 10, false);
+  uint16_t h = gfx->printCentredText(buffer, gfx->width() / 2, top + qrcodeSize + 10, false);
   h += 3; // some padding between the lines
   sprintf(buffer, "Passord: %s", password);
-  gfx.printCentredText(buffer, gfx.width() / 2, top + qrcodeSize + h + 10, false);
+  gfx->printCentredText(buffer, gfx->width() / 2, top + qrcodeSize + h + 10, false);
 
-  gfx.updateDisplay();
+  gfx->updateDisplay();
 }
 
 void setClock()
 {
+  // TODO: replace with ezTime
   configTime(0, 0, "pool.ntp.org");
   setenv("TZ", "CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00", 1);
   tzset();
@@ -81,6 +97,79 @@ void setClock()
   gmtime_r(&nowSecs, &timeinfo);
   Serial.print(F("Current time: "));
   Serial.print(asctime(&timeinfo));
+}
+
+JPEGDEC jpeg;
+Epaper *gfx;
+int drawImg(JPEGDRAW *pDraw)
+{
+  gfx->drawRGBBitmap(
+      pDraw->x,
+      pDraw->y,
+      pDraw->pPixels,
+      pDraw->iWidth,
+      pDraw->iHeight);
+  return 1;
+}
+
+bool getJpeg(String url, String token)
+{
+  NetworkClientSecure client;
+
+  client.setCACert(cloudflareRootCACert);
+
+  HTTPClient http;
+  http.addHeader("authorization", "bearer " + token);
+  http.useHTTP10();
+  http.begin(client, url);
+  int httpCode = http.GET();
+
+  if (httpCode != 200)
+  {
+    log_d("Failed to fetch the JPEG image, HTTP code: %d\n", httpCode);
+
+    return false;
+  }
+
+  int size = http.getSize();
+  log_d("Size: %d\n", size);
+  NetworkClient *stream = http.getStreamPtr();
+  uint8_t *buffer = new uint8_t[size];
+  size_t bytesRead = 0;
+  while (bytesRead < size)
+  {
+    bytesRead += stream->readBytes(buffer + bytesRead, size);
+  }
+  log_d("downloaded image\n");
+  http.end();
+
+  if (jpeg.openRAM(buffer, size, drawImg))
+  {
+    log_d("opened jpeg\n");
+    log_d("Image size: %d x %d, orientation: %d, bpp: %d\n", jpeg.getWidth(), jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp());
+
+    unsigned long lTime = micros();
+    if (jpeg.decode(0, 0, 0))
+    {
+      lTime = micros() - lTime;
+      log_d("Decoded image in %d us\n", (int)lTime);
+      return true;
+    }
+    else
+    {
+      log_d("Failed to decode image %d", jpeg.getLastError());
+
+      return false;
+    }
+    jpeg.close();
+    delete[] buffer;
+  }
+  else
+  {
+    log_d("Could not open jpeg %d\n", jpeg.getLastError());
+
+    return false;
+  }
 }
 
 void setup()
@@ -114,8 +203,7 @@ void setup()
   tft.println("Set...");
 
   // SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
-  Epaper gfx = Epaper(A5, A4, A3, A2);
-  gfx.setRotation(2); // rotate upside down
+  gfx = new Epaper(A5, A4, A3, A2);
 
   tft.println("Go!");
 
@@ -144,20 +232,20 @@ void setup()
 
     wm.setSaveConfigCallback([&]()
                              {      
-      gfx.fillScreen(EPD_7IN3E_WHITE);
-      gfx.setFont(&FreeSans24pt7b);
-      gfx.setTextColor(EPD_7IN3E_BLACK);
-      gfx.printCentredText("Koblet til WiFi", gfx.width()/2, gfx.height()/2);
-      gfx.updateDisplay(); });
+      gfx->fillScreen(EPD_7IN3E_WHITE);
+      gfx->setFont(&FreeSans24pt7b);
+      gfx->setTextColor(EPD_7IN3E_BLACK);
+      gfx->printCentredText("Koblet til WiFi", gfx->width()/2, gfx->height()/2);
+      gfx->updateDisplay(); });
   }
 
   if (!wm.autoConnect("bilderamme", "password"))
   {
-    gfx.fillScreen(EPD_7IN3E_WHITE);
-    gfx.setFont(&FreeSans24pt7b);
-    gfx.setTextColor(EPD_7IN3E_BLACK);
-    gfx.printCentredText("Trykk på knappen for å koble til wifi", gfx.width() / 2, gfx.height() / 2);
-    gfx.updateDisplay();
+    gfx->fillScreen(EPD_7IN3E_WHITE);
+    gfx->setFont(&FreeSans24pt7b);
+    gfx->setTextColor(EPD_7IN3E_BLACK);
+    gfx->printCentredText("Trykk på knappen for å koble til wifi", gfx->width() / 2, gfx->height() / 2);
+    gfx->updateDisplay();
 
     // TODO: set up trigger on GPIO0
 
@@ -179,28 +267,24 @@ void setup()
   tft.println("Drawing in black");
   delay(1000);
 
-  /*
-    gfx.fillScreen(ST77XX_BLACK);
-    gfx.fillRect(0, 0, 133, EPD_7IN3E_HEIGHT, ST77XX_BLACK);
-    gfx.fillRect(133, 0, 133, EPD_7IN3E_HEIGHT / 2, ST77XX_BLUE);
-    gfx.fillRect(133, EPD_7IN3E_HEIGHT / 2, 133, EPD_7IN3E_HEIGHT / 2, ST77XX_CYAN);
-    gfx.fillRect(266, 0, 134, EPD_7IN3E_HEIGHT / 2, ST77XX_RED);
-    gfx.fillRect(266, EPD_7IN3E_HEIGHT / 2, 134, EPD_7IN3E_HEIGHT / 2, ST77XX_MAGENTA);
-    gfx.fillRect(400, 0, 133, EPD_7IN3E_HEIGHT, ST77XX_GREEN);
-    gfx.fillRect(533, 0, 133, EPD_7IN3E_HEIGHT, ST77XX_YELLOW);
-    gfx.fillRect(666, 0, 134, EPD_7IN3E_HEIGHT, ST77XX_WHITE);
-    */
+  Preferences prefs;
 
-  gfx.fillScreen(ST77XX_MAGENTA);
-  gfx.dither();
+  prefs.begin("6-color-epd");
 
-  gfx.updateDisplay();
+  getJpeg("https://6-color-epd.pages.dev/photo", prefs.getString("token"));
+
+  unsigned long lTime = micros();
+  gfx->dither();
+  lTime = micros() - lTime;
+  log_d("Dithered image in %d us\n", (int)lTime);
+
+  gfx->updateDisplay();
 
   delay(5000);
 
-  // gfx.fillScreen(EPD_7IN3E_WHITE);
-  gfx.setFont(&FreeSans24pt7b);
-  gfx.setTextColor(EPD_7IN3E_YELLOW);
+  // gfx->fillScreen(EPD_7IN3E_WHITE);
+  gfx->setFont(&FreeSans24pt7b);
+  gfx->setTextColor(EPD_7IN3E_YELLOW);
 
   time_t nowSecs = time(nullptr);
   struct tm timeinfo;
@@ -209,8 +293,8 @@ void setup()
   char *timeStr = asctime(&timeinfo);
   Serial.println(timeStr);
 
-  gfx.printCentredText(timeStr, gfx.width() / 2, gfx.height() / 2);
-  gfx.updateDisplay();
+  gfx->printCentredText(timeStr, gfx->width() / 2, gfx->height() / 2);
+  // gfx->updateDisplay();
 
   int minutesUntilNextHour = 59 - timeinfo.tm_min;
   if (minutesUntilNextHour < 5)

@@ -33,10 +33,6 @@
 
 #include <Arduino.h>
 
-// Display resolution
-#define EPD_7IN3E_WIDTH 800
-#define EPD_7IN3E_HEIGHT 480
-
 /**********************************
 Color Index
 **********************************/
@@ -54,8 +50,6 @@ class EPD_7in3e
     uint8_t _dc;
     uint8_t _busy;
     uint8_t _reset;
-    uint16_t _width;
-    uint16_t _height;
 
     void reset(void);
     void sendCommand(uint8_t Reg);
@@ -65,10 +59,10 @@ class EPD_7in3e
     void turnOnDisplay(void);
 
 public:
-    EPD_7in3e(uint8_t cs, uint8_t dc, uint8_t busy, uint8_t reset, uint16_t width, uint16_t height);
+    EPD_7in3e(uint8_t cs, uint8_t dc, uint8_t busy, uint8_t reset);
     void init();
-    void clear(uint8_t color);
-    void draw(std::function<uint8_t(int, int)> lambda);
+    void clear(int width, int height, uint8_t color);
+    void draw(int width, int height, std::function<uint8_t(int, int)> lambda);
     void sleep(void);
 };
 

@@ -98,12 +98,10 @@ void EPD_7in3e::readBusyH(void)
     log_d("e-Paper busy H release\r\n");
 }
 
-EPD_7in3e::EPD_7in3e(uint8_t cs, uint8_t dc, uint8_t busy, uint8_t reset, uint16_t width, uint16_t height) : _cs(cs),
-                                                                                                             _dc(dc),
-                                                                                                             _busy(busy),
-                                                                                                             _reset(reset),
-                                                                                                             _width(width),
-                                                                                                             _height(height)
+EPD_7in3e::EPD_7in3e(uint8_t cs, uint8_t dc, uint8_t busy, uint8_t reset) : _cs(cs),
+                                                                            _dc(dc),
+                                                                            _busy(busy),
+                                                                            _reset(reset)
 {
 }
 
@@ -219,11 +217,11 @@ void EPD_7in3e::init(void)
 function :  Clear screen
 parameter:
 ******************************************************************************/
-void EPD_7in3e::clear(uint8_t color)
+void EPD_7in3e::clear(int width, int height, uint8_t color)
 {
     uint16_t Width, Height;
-    Width = (_width % 2 == 0) ? (_width / 2) : (_width / 2 + 1);
-    Height = _height;
+    Width = (width % 2 == 0) ? (width / 2) : (width / 2 + 1);
+    Height = height;
 
     sendCommand(0x10);
     for (uint16_t j = 0; j < Height; j++)
@@ -237,21 +235,21 @@ void EPD_7in3e::clear(uint8_t color)
     turnOnDisplay();
 }
 
-void EPD_7in3e::draw(std::function<uint8_t(int, int)> lambda)
+void EPD_7in3e::draw(int width, int height, std::function<uint8_t(int, int)> lambda)
 {
-    uint8_t buffer[_width / 2];
+    uint8_t buffer[width / 2];
 
     sendCommand(0x10);
 
-    for (int y = 0; y < _height; y++)
+    for (int y = 0; y < height; y++)
     {
-        for (int x = 0; x < _width; x += 2)
+        for (int x = 0; x < width; x += 2)
         {
             auto p1 = lambda(x + 0, y);
             auto p2 = lambda(x + 1, y);
             buffer[x / 2] = (p1 << 4) | (p2 << 0);
         }
-        sendData(buffer, _width / 2);
+        sendData(buffer, width / 2);
     }
 
     turnOnDisplay();
