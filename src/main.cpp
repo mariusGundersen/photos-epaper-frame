@@ -12,7 +12,6 @@
 #define uS_TO_S_FACTOR 1000000ULL /* Conversion factor for micro seconds to seconds */
 
 Preferences prefs;
-Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, -1);
 Epaper *gfx;
 uint8_t x = 0;
 uint16_t rgb = 0;
@@ -122,6 +121,61 @@ void wifiScreen(Epaper *gfx, const char *ssid, const char *password)
   gfx->printCentredText(buffer, gfx->width() / 2, top + qrcodeSize + h + 10, false);
 
   gfx->updateDisplay();
+}
+
+void connectToWifi()
+{
+
+  WiFi.mode(WIFI_STA);
+  WiFiManager wm;
+  WiFiManagerParameter token("token", "Token", prefs.getString("token").c_str(), 40);
+  wm.addParameter(&token);
+
+  // wm.resetSettings();
+
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER)
+  {
+    // try to connect, if fails, show message screen and go back to sleep
+    wm.setConnectTimeout(0);
+    wm.setEnableConfigPortal(false);
+  }
+  else
+  {
+    // try to connect, if fails, show config portal for 2 minutes, then show message screen and go back to sleep
+    wm.setConfigPortalTimeout(120);
+    wm.setEnableConfigPortal(true);
+    wm.setCaptivePortalEnable(true);
+    wm.setAPCallback([&](WiFiManager *wm)
+                     { wifiScreen(gfx, "bilderamme", "password"); });
+
+    // TODO: show different qrcode when a client has connected
+    WiFi.onEvent([&](WiFiEvent_t event, WiFiEventInfo_t info)
+                 { goHereScreen(); }, WiFiEvent_t::ARDUINO_EVENT_WIFI_AP_STACONNECTED);
+
+    wm.setSaveConfigCallback([&]()
+                             {
+                              prefs.putString("token", token.getValue());
+      gfx->fillScreen(EPD_7IN3E_WHITE);
+      gfx->setFont(&FreeSans24pt7b);
+      gfx->setTextColor(EPD_7IN3E_BLACK);
+      gfx->printCentredText("Koblet til WiFi");
+      gfx->updateDisplay(); });
+  }
+
+  if (!wm.autoConnect("bilderamme", "password"))
+  {
+    gfx->fillScreen(EPD_7IN3E_WHITE);
+    gfx->setFont(&FreeSans24pt7b);
+    gfx->setTextColor(EPD_7IN3E_BLACK);
+    gfx->printCentredText("Trykk p† knappen for † koble til wifi");
+    gfx->updateDisplay();
+
+    // TODO: set up trigger on GPIO0
+
+    // now sleep...
+    esp_deep_sleep_start();
+  }
 }
 
 void setClock()
@@ -242,142 +296,11 @@ bool getJpeg(String url)
   }
 }
 
-void setup()
+void sleepUntilNextHour()
 {
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-
-  Serial.begin();
-
-  delay(1000);
-
-  /////////TFT////////////
-
-  Serial.println("Started");
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
-  pinMode(TFT_I2C_POWER, OUTPUT);
-  digitalWrite(TFT_I2C_POWER, HIGH);
-  pinMode(TFT_BACKLITE, OUTPUT);
-  digitalWrite(TFT_BACKLITE, HIGH);
-  tft.init(135, 240);
-
-  delay(500);
-
-  tft.enableDisplay(true);
-
-  tft.fillRect(0, 0, 135, 240, ST77XX_BLUE);
-
-  Serial.println(("TFT INIT"));
-
-  // tft.drawLine(70, 0, 70, 239, ST77XX_GREEN);
-  tft.setTextColor(ST77XX_WHITE);
-  tft.setCursor(0, 0);
-  tft.println("Ready!");
-
-  tft.println("Set...");
-
-  ///////////// PREFS ////////////////
-  prefs.begin("6-color-epd");
-
-  // SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
-  gfx = new Epaper(A5, A4, A3, A2, 800, 480);
-  gfx->setRotation(1);
-
-  /*
-  gfx->fillScreen(EPD_7IN3E_BLACK);
-  gfx->setTextColor(EPD_7IN3E_RED);
-  gfx->setFont(&FreeSans24pt7b);
-  gfx->printCentredText("TESTING");
-  gfx->updateDisplay();
-  */
-
-  tft.println("Go!");
-
-  ////////////////////////////////////////
-
-  WiFi.mode(WIFI_STA);
-  WiFiManager wm;
-  WiFiManagerParameter token("token", "Token", prefs.getString("token").c_str(), 40);
-  wm.addParameter(&token);
-
-  // wm.resetSettings();
-
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER)
-  {
-    // try to connect, if fails, show message screen and go back to sleep
-    wm.setConnectTimeout(0);
-    wm.setEnableConfigPortal(false);
-  }
-  else
-  {
-    // try to connect, if fails, show config portal for 2 minutes, then show message screen and go back to sleep
-    wm.setConfigPortalTimeout(120);
-    wm.setEnableConfigPortal(true);
-    wm.setCaptivePortalEnable(true);
-    wm.setAPCallback([&](WiFiManager *wm)
-                     { wifiScreen(gfx, "bilderamme", "password"); });
-
-    // TODO: show different qrcode when a client has connected
-    WiFi.onEvent([&](WiFiEvent_t event, WiFiEventInfo_t info)
-                 { goHereScreen(); }, WiFiEvent_t::ARDUINO_EVENT_WIFI_AP_STACONNECTED);
-
-    wm.setSaveConfigCallback([&]()
-                             {
-                              prefs.putString("token", token.getValue());
-      gfx->fillScreen(EPD_7IN3E_WHITE);
-      gfx->setFont(&FreeSans24pt7b);
-      gfx->setTextColor(EPD_7IN3E_BLACK);
-      gfx->printCentredText("Koblet til WiFi");
-      gfx->updateDisplay(); });
-  }
-
-  if (!wm.autoConnect("bilderamme", "password"))
-  {
-    gfx->fillScreen(EPD_7IN3E_WHITE);
-    gfx->setFont(&FreeSans24pt7b);
-    gfx->setTextColor(EPD_7IN3E_BLACK);
-    gfx->printCentredText("Trykk p† knappen for † koble til wifi");
-    gfx->updateDisplay();
-
-    // TODO: set up trigger on GPIO0
-
-    // now sleep...
-    esp_deep_sleep_start();
-  }
-
-  tft.println("Wifi connected");
-
-  setClock();
-
-  doOTA();
-
-  // log_d("e-Paper Init and Clear...\r\n");
-  delay(1000);
-
-  tft.println("Drawing in black");
-  delay(1000);
-
-  if (getJpeg("https://6-color-epd.pages.dev/photo"))
-  {
-    gfx->dither();
-    gfx->updateDisplay();
-  }
-
-  delay(5000);
-
-  // gfx->fillScreen(EPD_7IN3E_WHITE);
-  gfx->setFont(&FreeSans24pt7b);
-  gfx->setTextColor(EPD_7IN3E_YELLOW);
-
   time_t nowSecs = time(nullptr);
   struct tm timeinfo;
   gmtime_r(&nowSecs, &timeinfo);
-
-  char *timeStr = asctime(&timeinfo);
-  Serial.println(timeStr);
-
-  gfx->printCentredText(timeStr);
-  // gfx->updateDisplay();
 
   int minutesUntilNextHour = 59 - timeinfo.tm_min;
   if (minutesUntilNextHour < 5)
@@ -398,16 +321,40 @@ void setup()
   esp_deep_sleep_start();
 }
 
+void setup()
+{
+  Serial.begin();
+
+  /////////TFT////////////
+
+  Serial.println("Started");
+
+  ///////////// PREFS ////////////////
+  prefs.begin("6-color-epd");
+
+  // SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
+  gfx = new Epaper(A5, A4, A3, A2, 800, 480);
+  gfx->setRotation(1);
+
+  ////////////////////////////////////////
+
+  connectToWifi();
+  setClock();
+  doOTA();
+
+  if (getJpeg("https://6-color-epd.pages.dev/photo"))
+  {
+    gfx->dither();
+    gfx->updateDisplay();
+  }
+
+  sleepUntilNextHour();
+}
+
 void loop()
 {
   digitalWrite(LED_BUILTIN, HIGH);
   delay(500);
-
-  tft.drawLine(x, 0, x, 239, rgb++);
-
-  x = (x + 1) % 135;
-
-  Serial.println("Blink");
 
   digitalWrite(LED_BUILTIN, LOW);
   delay(500);
