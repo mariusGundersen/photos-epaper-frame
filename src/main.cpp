@@ -281,7 +281,7 @@ void setup()
 
   // SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
   gfx = new Epaper(A5, A4, A3, A2, 800, 480);
-  gfx->setRotation(3);
+  gfx->setRotation(1);
 
   /*
   gfx->fillScreen(EPD_7IN3E_BLACK);
