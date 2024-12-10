@@ -123,15 +123,17 @@ void wifiScreen(Epaper *gfx, const char *ssid, const char *password)
   gfx->updateDisplay();
 }
 
-void connectToWifi()
+void connectToWifi(bool reset)
 {
-
   WiFi.mode(WIFI_STA);
   WiFiManager wm;
   WiFiManagerParameter token("token", "Token", prefs.getString("token").c_str(), 40);
   wm.addParameter(&token);
 
-  // wm.resetSettings();
+  if (reset)
+  {
+    wm.resetSettings();
+  }
 
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
   if (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER)
@@ -332,13 +334,16 @@ void setup()
   ///////////// PREFS ////////////////
   prefs.begin("6-color-epd");
 
+  SPI.setBitOrder(MSBFIRST);
+  SPI.setDataMode(SPI_MODE0);
+  SPI.setFrequency(4000000);
   // SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
   gfx = new Epaper(A5, A4, A3, A2, 800, 480);
   gfx->setRotation(1);
 
   ////////////////////////////////////////
 
-  connectToWifi();
+  connectToWifi(true);
   setClock();
   doOTA();
 
