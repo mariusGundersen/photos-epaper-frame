@@ -13,6 +13,7 @@
 
 Preferences prefs;
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, -1);
+Epaper *gfx;
 uint8_t x = 0;
 uint16_t rgb = 0;
 
@@ -35,6 +36,46 @@ void doOTA()
   GithubUpdate updater;
 
   updater.update("mariusGundersen", "photos-epaper-frame", "firmware.bin");
+}
+
+void goHereScreen()
+{
+  String hostname = WiFi.AP.gatewayIP().toString();
+  String text = String("http://");
+  text.concat(hostname);
+  text.concat("/wifi");
+  QRCode qrcode;
+  uint8_t qrcodeData[qrcode_getBufferSize(4)];
+
+  qrcode_initText(&qrcode, qrcodeData, 4, ECC_MEDIUM, text.c_str());
+
+  gfx->fillScreen(EPD_7IN3E_WHITE);
+  gfx->setFont(&FreeSans24pt7b);
+  gfx->setTextColor(EPD_7IN3E_BLACK);
+
+  uint8_t scale = 4;
+  uint16_t qrcodeSize = qrcode.size * scale;
+  uint16_t left = (gfx->width() - qrcodeSize) / 2;
+  uint16_t top = (gfx->height() - qrcodeSize) / 2;
+  gfx->printCentredText("G\x8F til denne siden", gfx->width() / 2, top / 2);
+
+  for (uint8_t y = 0; y < qrcode.size; y++)
+  {
+    for (uint8_t x = 0; x < qrcode.size; x++)
+    {
+      gfx->fillRect(
+          left + x * scale,
+          top + y * scale,
+          scale,
+          scale,
+          qrcode_getModule(&qrcode, x, y) ? EPD_7IN3E_BLACK : EPD_7IN3E_WHITE);
+    }
+  }
+
+  gfx->setFont(&FreeSans12pt7b);
+  uint16_t h = gfx->printCentredText(text.c_str(), gfx->width() / 2, top + qrcodeSize + 10, false);
+
+  gfx->updateDisplay();
 }
 
 void wifiScreen(Epaper *gfx, const char *ssid, const char *password)
@@ -108,7 +149,6 @@ void setClock()
 }
 
 JPEGDEC jpeg;
-Epaper *gfx;
 int drawImg(JPEGDRAW *pDraw)
 {
   gfx->drawRGBBitmap(
@@ -243,11 +283,13 @@ void setup()
   gfx = new Epaper(A5, A4, A3, A2, 800, 480);
   gfx->setRotation(3);
 
+  /*
   gfx->fillScreen(EPD_7IN3E_BLACK);
   gfx->setTextColor(EPD_7IN3E_RED);
   gfx->setFont(&FreeSans24pt7b);
   gfx->printCentredText("TESTING");
   gfx->updateDisplay();
+  */
 
   tft.println("Go!");
 
@@ -274,7 +316,10 @@ void setup()
     wm.setCaptivePortalEnable(true);
     wm.setAPCallback([&](WiFiManager *wm)
                      { wifiScreen(gfx, "bilderamme", "password"); });
+
     // TODO: show different qrcode when a client has connected
+    WiFi.onEvent([&](WiFiEvent_t event, WiFiEventInfo_t info)
+                 { goHereScreen(); }, WiFiEvent_t::ARDUINO_EVENT_WIFI_AP_STACONNECTED);
 
     wm.setSaveConfigCallback([&]()
                              {
@@ -291,7 +336,7 @@ void setup()
     gfx->fillScreen(EPD_7IN3E_WHITE);
     gfx->setFont(&FreeSans24pt7b);
     gfx->setTextColor(EPD_7IN3E_BLACK);
-    gfx->printCentredText("Trykk pÃ¥ knappen for Ã¥ koble til wifi");
+    gfx->printCentredText("Trykk p† knappen for † koble til wifi");
     gfx->updateDisplay();
 
     // TODO: set up trigger on GPIO0
