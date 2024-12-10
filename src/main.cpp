@@ -11,6 +11,7 @@
 
 #define uS_TO_S_FACTOR 1000000ULL /* Conversion factor for micro seconds to seconds */
 
+Preferences prefs;
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, -1);
 uint8_t x = 0;
 uint16_t rgb = 0;
@@ -119,19 +120,30 @@ int drawImg(JPEGDRAW *pDraw)
   return 1;
 }
 
-bool getJpeg(String url, String token)
+bool getJpeg(String url)
 {
   NetworkClientSecure client;
 
   client.setCACert(cloudflareRootCACert);
 
   HTTPClient http;
-  http.addHeader("authorization", "bearer " + token);
+  http.addHeader("Authorization", prefs.getString("token"));
+  http.addHeader("If-None-Match", prefs.getString("ETag"));
+
+  const char *headerKeys[] = {"ETag"};
+  const size_t headerKeysCount = sizeof(headerKeys) / sizeof(headerKeys[0]);
+  http.collectHeaders(headerKeys, headerKeysCount);
+
   http.useHTTP10();
   http.begin(client, url);
   int httpCode = http.GET();
 
-  if (httpCode != 200)
+  if (httpCode == HTTP_CODE_NOT_MODIFIED)
+  {
+    log_d("Not modified");
+    return false;
+  }
+  else if (httpCode != HTTP_CODE_OK)
   {
     log_d("Failed to fetch the JPEG image, HTTP code: %d\n", httpCode);
 
@@ -140,6 +152,14 @@ bool getJpeg(String url, String token)
 
   int size = http.getSize();
   log_d("Size: %d\n", size);
+
+  if (size == 0)
+  {
+    log_d("Got zero bytes");
+    return false;
+  }
+
+  String etag = http.header("ETag");
   NetworkClient *stream = http.getStreamPtr();
   uint8_t *buffer = new uint8_t[size];
   size_t bytesRead = 0;
@@ -160,16 +180,19 @@ bool getJpeg(String url, String token)
     {
       lTime = micros() - lTime;
       log_d("Decoded image in %d us\n", (int)lTime);
+
+      prefs.putString("ETag", etag);
+      jpeg.close();
+      delete[] buffer;
       return true;
     }
     else
     {
       log_d("Failed to decode image %d", jpeg.getLastError());
-
+      jpeg.close();
+      delete[] buffer;
       return false;
     }
-    jpeg.close();
-    delete[] buffer;
   }
   else
   {
@@ -184,7 +207,11 @@ void setup()
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
 
   Serial.begin();
+
   delay(1000);
+
+  /////////TFT////////////
+
   Serial.println("Started");
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
@@ -209,6 +236,9 @@ void setup()
 
   tft.println("Set...");
 
+  ///////////// PREFS ////////////////
+  prefs.begin("6-color-epd");
+
   // SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
   gfx = new Epaper(A5, A4, A3, A2, 800, 480);
   gfx->setRotation(3);
@@ -225,6 +255,8 @@ void setup()
 
   WiFi.mode(WIFI_STA);
   WiFiManager wm;
+  WiFiManagerParameter token("token", "Token", prefs.getString("token").c_str(), 40);
+  wm.addParameter(&token);
 
   // wm.resetSettings();
 
@@ -245,7 +277,8 @@ void setup()
     // TODO: show different qrcode when a client has connected
 
     wm.setSaveConfigCallback([&]()
-                             {      
+                             {
+                              prefs.putString("token", token.getValue());
       gfx->fillScreen(EPD_7IN3E_WHITE);
       gfx->setFont(&FreeSans24pt7b);
       gfx->setTextColor(EPD_7IN3E_BLACK);
@@ -279,15 +312,11 @@ void setup()
   tft.println("Drawing in black");
   delay(1000);
 
-  Preferences prefs;
-
-  prefs.begin("6-color-epd");
-
-  getJpeg("https://6-color-epd.pages.dev/photo", prefs.getString("token"));
-
-  gfx->dither();
-
-  gfx->updateDisplay();
+  if (getJpeg("https://6-color-epd.pages.dev/photo"))
+  {
+    gfx->dither();
+    gfx->updateDisplay();
+  }
 
   delay(5000);
 
