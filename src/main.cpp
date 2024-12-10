@@ -29,6 +29,13 @@ const char *cloudflareRootCACert = "-----BEGIN CERTIFICATE-----\n"
                                    "p/SgguMh1YQdc4acLa/KNJvxn7kjNuK8YAOdgLOaVsjh4rsUecrNIdSUtUlD\n"
                                    "-----END CERTIFICATE-----";
 
+void doOTA()
+{
+  GithubUpdate updater;
+
+  updater.update("mariusGundersen", "photos-epaper-frame", "firmware.bin");
+}
+
 void wifiScreen(Epaper *gfx, const char *ssid, const char *password)
 {
   String text = String("WIFI:T:WPA:S:");
@@ -203,7 +210,14 @@ void setup()
   tft.println("Set...");
 
   // SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
-  gfx = new Epaper(A5, A4, A3, A2);
+  gfx = new Epaper(A5, A4, A3, A2, 800, 480);
+  gfx->setRotation(3);
+
+  gfx->fillScreen(EPD_7IN3E_BLACK);
+  gfx->setTextColor(EPD_7IN3E_RED);
+  gfx->setFont(&FreeSans24pt7b);
+  gfx->printCentredText("TESTING");
+  gfx->updateDisplay();
 
   tft.println("Go!");
 
@@ -235,7 +249,7 @@ void setup()
       gfx->fillScreen(EPD_7IN3E_WHITE);
       gfx->setFont(&FreeSans24pt7b);
       gfx->setTextColor(EPD_7IN3E_BLACK);
-      gfx->printCentredText("Koblet til WiFi", gfx->width()/2, gfx->height()/2);
+      gfx->printCentredText("Koblet til WiFi");
       gfx->updateDisplay(); });
   }
 
@@ -244,7 +258,7 @@ void setup()
     gfx->fillScreen(EPD_7IN3E_WHITE);
     gfx->setFont(&FreeSans24pt7b);
     gfx->setTextColor(EPD_7IN3E_BLACK);
-    gfx->printCentredText("Trykk på knappen for å koble til wifi", gfx->width() / 2, gfx->height() / 2);
+    gfx->printCentredText("Trykk på knappen for å koble til wifi");
     gfx->updateDisplay();
 
     // TODO: set up trigger on GPIO0
@@ -257,9 +271,7 @@ void setup()
 
   setClock();
 
-  GithubUpdate *updater = new GithubUpdate();
-
-  updater->update("mariusGundersen", "photos-epaper-frame", "firmware.bin");
+  doOTA();
 
   // log_d("e-Paper Init and Clear...\r\n");
   delay(1000);
@@ -273,10 +285,7 @@ void setup()
 
   getJpeg("https://6-color-epd.pages.dev/photo", prefs.getString("token"));
 
-  unsigned long lTime = micros();
   gfx->dither();
-  lTime = micros() - lTime;
-  log_d("Dithered image in %d us\n", (int)lTime);
 
   gfx->updateDisplay();
 
@@ -293,7 +302,7 @@ void setup()
   char *timeStr = asctime(&timeinfo);
   Serial.println(timeStr);
 
-  gfx->printCentredText(timeStr, gfx->width() / 2, gfx->height() / 2);
+  gfx->printCentredText(timeStr);
   // gfx->updateDisplay();
 
   int minutesUntilNextHour = 59 - timeinfo.tm_min;

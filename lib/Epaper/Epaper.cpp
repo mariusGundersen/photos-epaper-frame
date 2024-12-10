@@ -22,14 +22,26 @@ void Epaper::updateDisplay()
 {
     _epd.init();
     //_epd.clear(EPD_7IN3E_WHITE);
-    _epd.draw(_height, _width, [&](int x, int y)
-              { return getPixel(_width - y, x); });
+    _epd.draw(WIDTH, HEIGHT, [&](int x, int y)
+              { return getRawPixel(x, y); });
     _epd.sleep();
 }
 
 void Epaper::dither()
 {
-    _dither.dither(_width, _height, getBuffer());
+#if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_DEBUG
+    unsigned long lTime = micros();
+    _dither.dither(WIDTH, HEIGHT, getBuffer());
+    lTime = micros() - lTime;
+    log_d("Dithered image in %d us\n", (int)lTime);
+#else
+    _dither.dither(WIDTH, HEIGHT, getBuffer());
+#endif
+}
+
+uint16_t Epaper::printCentredText(const char *buf)
+{
+    return printCentredText(buf, _width / 2, _height / 2, true);
 }
 
 uint16_t Epaper::printCentredText(const char *buf, int x, int y, bool centerVertically)
