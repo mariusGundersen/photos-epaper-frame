@@ -31,7 +31,7 @@
         ]
       ],
       "mcu": "esp32s3",
-      "variant": "adafruit_feather_esp32s3_tft"
+      "variant": "adafruit_feather_esp32s3"
     },
     "connectivity": [
       "bluetooth",
@@ -44,7 +44,7 @@
       "arduino",
       "espidf"
     ],
-    "name": "Adafruit Feather ESP32-S3 TFT",
+    "name": "Adafruit Feather ESP32-S3",
     "upload": {
       "flash_size": "4MB",
       "maximum_ram_size": 327680,

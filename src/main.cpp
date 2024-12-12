@@ -337,7 +337,7 @@ void setup()
   SPI.begin();
   SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
   // SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
-  gfx = new Epaper(GPIO_NUM_5, GPIO_NUM_6, GPIO_NUM_12, GPIO_NUM_14, 800, 480);
+  gfx = new Epaper(A5, A4, A3, A2, 800, 480);
   gfx->setRotation(1);
 
   ////////////////////////////////////////
