@@ -15,6 +15,8 @@ Epaper *gfx;
 uint8_t x = 0;
 uint16_t rgb = 0;
 
+RTC_DATA_ATTR unsigned int counter = 0;
+
 const char *cloudflareRootCACert = "-----BEGIN CERTIFICATE-----\n"
                                    "MIICCTCCAY6gAwIBAgINAgPlwGjvYxqccpBQUjAKBggqhkjOPQQDAzBHMQswCQYD\n"
                                    "VQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExMQzEUMBIG\n"
@@ -161,25 +163,37 @@ void connectToWifi(bool reset = false)
       gfx->fillScreen(EPD_7IN3E_WHITE);
       gfx->setFont(&FreeSans24pt7b);
       gfx->setTextColor(EPD_7IN3E_BLACK);
-      gfx->printCentredText("Koblet til WiFi");
+      gfx->printCentredText("Connect to WiFi");
       gfx->updateDisplay(); });
   }
 
-  if (!wm.autoConnect("bilderamme", "password"))
+  if (wm.autoConnect("bilderamme", "password"))
   {
-    gfx->fillScreen(EPD_7IN3E_WHITE);
-    gfx->setFont(&FreeSans24pt7b);
-    gfx->setTextColor(EPD_7IN3E_BLACK);
-    gfx->printCentredText("Press Reset button");
-    gfx->updateDisplay();
+    counter = 0;
+  }
+  else
+  {
+    counter++;
+    if (counter > 5 || wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
+    {
+      gfx->fillScreen(EPD_7IN3E_WHITE);
+      gfx->setFont(&FreeSans24pt7b);
+      gfx->setTextColor(EPD_7IN3E_BLACK);
+      gfx->printCentredText("Press Reset button");
+      gfx->updateDisplay();
 
-    // make sure it refreshes the screen when it reconnects
-    prefs.remove("ETag");
+      // make sure it refreshes the screen when it reconnects
+      prefs.remove("ETag");
 
-    // TODO: set up trigger on GPIO0
+      // TODO: set up trigger on GPIO0
 
-    // now sleep...
-    esp_deep_sleep_start();
+      // now sleep...
+      esp_deep_sleep_start();
+    }
+    else
+    {
+      sleepUntilNextHour();
+    }
   }
 }
 
@@ -317,7 +331,7 @@ void sleepUntilNextHour()
   esp_sleep_enable_timer_wakeup(secondsUntilNextHour * uS_TO_S_FACTOR);
   log_d("Setup ESP32 to sleep for %d Seconds\n", secondsUntilNextHour);
 
-  // esp_sleep_enable_ext1_wakeup(1 << D2, ESP_EXT1_WAKEUP_ALL_LOW);
+  esp_sleep_enable_ext1_wakeup(1 << GPIO_NUM_0, ESP_EXT1_WAKEUP_ALL_LOW);
 
   log_d("Going to sleep now\n");
   if (Serial)
