@@ -124,6 +124,31 @@ void wifiScreen(Epaper *gfx, const char *ssid, const char *password)
   gfx->updateDisplay();
 }
 
+void sleepUntilNextHour()
+{
+  time_t nowSecs = time(nullptr);
+  struct tm timeinfo;
+  gmtime_r(&nowSecs, &timeinfo);
+
+  int minutesUntilNextHour = 59 - timeinfo.tm_min;
+  if (minutesUntilNextHour < 5)
+  {
+    minutesUntilNextHour += 60;
+  }
+  int secondsUntilNextHour = minutesUntilNextHour * 60 + (60 - timeinfo.tm_sec);
+
+  esp_sleep_enable_timer_wakeup(secondsUntilNextHour * uS_TO_S_FACTOR);
+  log_d("Setup ESP32 to sleep for %d Seconds\n", secondsUntilNextHour);
+
+  esp_sleep_enable_ext1_wakeup(1 << GPIO_NUM_0, ESP_EXT1_WAKEUP_ANY_LOW);
+
+  log_d("Going to sleep now\n");
+  if (Serial)
+    Serial.flush();
+
+  esp_deep_sleep_start();
+}
+
 void connectToWifi(bool reset = false)
 {
   WiFi.mode(WIFI_STA);
@@ -313,31 +338,6 @@ bool getJpeg(String url)
 
     return false;
   }
-}
-
-void sleepUntilNextHour()
-{
-  time_t nowSecs = time(nullptr);
-  struct tm timeinfo;
-  gmtime_r(&nowSecs, &timeinfo);
-
-  int minutesUntilNextHour = 59 - timeinfo.tm_min;
-  if (minutesUntilNextHour < 5)
-  {
-    minutesUntilNextHour += 60;
-  }
-  int secondsUntilNextHour = minutesUntilNextHour * 60 + (60 - timeinfo.tm_sec);
-
-  esp_sleep_enable_timer_wakeup(secondsUntilNextHour * uS_TO_S_FACTOR);
-  log_d("Setup ESP32 to sleep for %d Seconds\n", secondsUntilNextHour);
-
-  esp_sleep_enable_ext1_wakeup(1 << GPIO_NUM_0, ESP_EXT1_WAKEUP_ALL_LOW);
-
-  log_d("Going to sleep now\n");
-  if (Serial)
-    Serial.flush();
-
-  esp_deep_sleep_start();
 }
 
 void setup()
