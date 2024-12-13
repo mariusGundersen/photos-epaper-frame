@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <EPD_7in3e.h>
-#include <Adafruit_ST7789.h>
 #include <WiFiManager.h>
 #include <qrcode.h>
 #include <Fonts/FreeSans24pt7b.h>
@@ -56,7 +55,7 @@ void goHereScreen()
   uint16_t qrcodeSize = qrcode.size * scale;
   uint16_t left = (gfx->width() - qrcodeSize) / 2;
   uint16_t top = (gfx->height() - qrcodeSize) / 2;
-  gfx->printCentredText("G\x8F til denne siden", gfx->width() / 2, top / 2);
+  gfx->printCentredText("Go to this page", gfx->width() / 2, top / 2);
 
   for (uint8_t y = 0; y < qrcode.size; y++)
   {
@@ -97,7 +96,7 @@ void wifiScreen(Epaper *gfx, const char *ssid, const char *password)
   uint16_t qrcodeSize = qrcode.size * scale;
   uint16_t left = (gfx->width() - qrcodeSize) / 2;
   uint16_t top = (gfx->height() - qrcodeSize) / 2;
-  gfx->printCentredText("Koble til WiFi", gfx->width() / 2, top / 2);
+  gfx->printCentredText("Connect to WiFi", gfx->width() / 2, top / 2);
 
   for (uint8_t y = 0; y < qrcode.size; y++)
   {
@@ -117,7 +116,7 @@ void wifiScreen(Epaper *gfx, const char *ssid, const char *password)
   sprintf(buffer, "SSID: %s", ssid);
   uint16_t h = gfx->printCentredText(buffer, gfx->width() / 2, top + qrcodeSize + 10, false);
   h += 3; // some padding between the lines
-  sprintf(buffer, "Passord: %s", password);
+  sprintf(buffer, "Password: %s", password);
   gfx->printCentredText(buffer, gfx->width() / 2, top + qrcodeSize + h + 10, false);
 
   gfx->updateDisplay();
@@ -151,9 +150,10 @@ void connectToWifi(bool reset = false)
     wm.setAPCallback([&](WiFiManager *wm)
                      { wifiScreen(gfx, "bilderamme", "password"); });
 
-    // TODO: show different qrcode when a client has connected
-    WiFi.onEvent([&](WiFiEvent_t event, WiFiEventInfo_t info)
-                 { goHereScreen(); }, WiFiEvent_t::ARDUINO_EVENT_WIFI_AP_STACONNECTED);
+    network_event_handle_t event = WiFi.onEvent([&](WiFiEvent_t event, WiFiEventInfo_t info)
+                                                {
+                  WiFi.removeEvent(event);
+                  goHereScreen(); }, WiFiEvent_t::ARDUINO_EVENT_WIFI_AP_STACONNECTED);
 
     wm.setSaveConfigCallback([&]()
                              {
@@ -170,8 +170,11 @@ void connectToWifi(bool reset = false)
     gfx->fillScreen(EPD_7IN3E_WHITE);
     gfx->setFont(&FreeSans24pt7b);
     gfx->setTextColor(EPD_7IN3E_BLACK);
-    gfx->printCentredText("Trykk p† knappen for † koble til wifi");
+    gfx->printCentredText("Press Reset button");
     gfx->updateDisplay();
+
+    // make sure it refreshes the screen when it reconnects
+    prefs.remove("ETag");
 
     // TODO: set up trigger on GPIO0
 
@@ -336,7 +339,6 @@ void setup()
 
   SPI.begin();
   SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
-  // SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
   gfx = new Epaper(A5, A4, A3, A2, 800, 480);
   gfx->setRotation(1);
 
