@@ -7,6 +7,11 @@ on:
     tags:
       - "v*.*.*"
 
+# Ensure builds run sequentially per branch, cancel running PR/branch builds.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 permissions:
   contents: write
 
@@ -15,6 +20,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # To reduce the attack surface, don't expose the token to subsequent
+          # steps implicitly, particularly not to custom, 3rd party build logic.
+          # See https://github.com/actions/checkout/issues/485
+          persist-credentials: false
+          fetch-depth: 0
+
       - uses: actions/cache@v4
         with:
           path: |
