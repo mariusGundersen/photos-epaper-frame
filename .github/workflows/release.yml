@@ -50,7 +50,9 @@ jobs:
         name: Create release
         uses: mgoltzsche/conventional-release@v0
         with:
-          github-release-files: .pio/build/release/firmware.bi
+          github-release-files: .pio/build/release/firmware.bin
+          ignore-commits-before: 2eb3ca4f
+#
 #      - name: Release
 #        uses: softprops/action-gh-release@v2
 #        if: startsWith(github.ref, 'refs/tags/v')
