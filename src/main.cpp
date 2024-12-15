@@ -148,7 +148,7 @@ void sleepUntilNextHour(bool untilTomorrrow = true)
   esp_sleep_enable_timer_wakeup(secondsToSleep * uS_TO_S_FACTOR);
   log_d("Setup ESP32 to sleep for %d Seconds\n", secondsToSleep);
 
-  esp_sleep_enable_ext1_wakeup(1 << GPIO_NUM_0, ESP_EXT1_WAKEUP_ALL_HIGH);
+  esp_sleep_enable_ext1_wakeup(1 << GPIO_NUM_0, ESP_EXT1_WAKEUP_ANY_HIGH);
 
   log_d("Going to sleep now\n");
   if (Serial)
