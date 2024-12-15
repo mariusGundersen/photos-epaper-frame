@@ -157,7 +157,7 @@ void sleepUntilNextHour(bool untilTomorrrow = true)
   esp_deep_sleep_start();
 }
 
-void connectToWifi(bool reset = false)
+void connectToWifi(esp_sleep_wakeup_cause_t wakeup_reason, bool reset = false)
 {
   WiFi.mode(WIFI_STA);
   WiFiManager wm;
@@ -169,7 +169,6 @@ void connectToWifi(bool reset = false)
     wm.resetSettings();
   }
 
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
   if (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER)
   {
     // try to connect, if fails, show message screen and go back to sleep
@@ -344,6 +343,19 @@ bool getJpeg(String url)
 
 void setup()
 {
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
+  {
+    digitalWrite(LED_BUILTIN, HIGH);
+    delay(500);
+    digitalWrite(LED_BUILTIN, LOW);
+    delay(500);
+    digitalWrite(LED_BUILTIN, HIGH);
+    delay(500);
+    digitalWrite(LED_BUILTIN, LOW);
+    delay(500);
+  }
+  
   Serial.begin();
 
   /////////TFT////////////
@@ -360,7 +372,7 @@ void setup()
 
   ////////////////////////////////////////
 
-  connectToWifi();
+  connectToWifi(wakeup_reason);
   setClock();
   doOTA();
 
