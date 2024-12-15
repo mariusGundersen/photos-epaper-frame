@@ -124,21 +124,29 @@ void wifiScreen(Epaper *gfx, const char *ssid, const char *password)
   gfx->updateDisplay();
 }
 
-void sleepUntilNextHour()
+void sleepUntilNextHour(bool untilTomorrrow = true)
 {
   time_t nowSecs = time(nullptr);
   struct tm timeinfo;
   gmtime_r(&nowSecs, &timeinfo);
+
+  int hoursUntilTomorrowMorning = untilTomorrrow ? 6 - timeinfo.tm_hour : 0;
+  if (hoursUntilTomorrowMorning < 0)
+  {
+    hoursUntilTomorrowMorning += 24;
+  }
 
   int minutesUntilNextHour = 59 - timeinfo.tm_min;
   if (minutesUntilNextHour < 5)
   {
     minutesUntilNextHour += 60;
   }
-  int secondsUntilNextHour = minutesUntilNextHour * 60 + (60 - timeinfo.tm_sec);
 
-  esp_sleep_enable_timer_wakeup(secondsUntilNextHour * uS_TO_S_FACTOR);
-  log_d("Setup ESP32 to sleep for %d Seconds\n", secondsUntilNextHour);
+  int secondsUntilNextMinute = 60 - timeinfo.tm_sec;
+  int secondsToSleep = (hoursUntilTomorrowMorning * 60 + minutesUntilNextHour) * 60 + secondsUntilNextMinute;
+
+  esp_sleep_enable_timer_wakeup(secondsToSleep * uS_TO_S_FACTOR);
+  log_d("Setup ESP32 to sleep for %d Seconds\n", secondsToSleep);
 
   esp_sleep_enable_ext1_wakeup(1 << GPIO_NUM_0, ESP_EXT1_WAKEUP_ANY_LOW);
 
@@ -209,16 +217,10 @@ void connectToWifi(bool reset = false)
 
       // make sure it refreshes the screen when it reconnects
       prefs.remove("ETag");
-
-      // TODO: set up trigger on GPIO0
-
-      // now sleep...
-      esp_deep_sleep_start();
     }
-    else
-    {
-      sleepUntilNextHour();
-    }
+
+    // now sleep for 1 hour then retry
+    sleepUntilNextHour(false);
   }
 }
 
