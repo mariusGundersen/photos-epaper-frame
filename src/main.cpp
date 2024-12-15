@@ -346,6 +346,7 @@ void setup()
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
+    pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, HIGH);
     delay(500);
     digitalWrite(LED_BUILTIN, LOW);
