@@ -31,7 +31,7 @@ struct Battery
   float chargeRate = 0;
   bool isCharging()
   {
-    return chargeRate > 0;
+    return chargeRate > 0.01;
   }
 };
 
