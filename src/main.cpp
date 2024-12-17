@@ -17,6 +17,24 @@ Adafruit_MAX17048 maxlipo;
 uint8_t x = 0;
 uint16_t rgb = 0;
 
+enum struct SleepDuration
+{
+  untilTomorrow,
+  untilNextHour,
+  fiveMinutes
+};
+
+struct Battery
+{
+  float cellPercent = 0;
+  float cellVoltage = -1;
+  float chargeRate = 0;
+  bool isCharging()
+  {
+    return chargeRate > 0;
+  }
+};
+
 RTC_DATA_ATTR unsigned int counter = 0;
 
 const char *cloudflareRootCACert = "-----BEGIN CERTIFICATE-----\n"
@@ -126,29 +144,29 @@ void wifiScreen(Epaper *gfx, const char *ssid, const char *password)
   gfx->updateDisplay();
 }
 
-void sleepUntilNextHour(bool untilTomorrrow = true)
+void enterDeepSleep(SleepDuration sleepDuration)
 {
   time_t nowSecs = time(nullptr);
   struct tm timeinfo;
   gmtime_r(&nowSecs, &timeinfo);
 
-  int hoursUntilTomorrowMorning = untilTomorrrow ? 6 - timeinfo.tm_hour : 0;
-  if (hoursUntilTomorrowMorning < 0)
+  int hoursToSleep = sleepDuration == SleepDuration::untilTomorrow ? 6 - timeinfo.tm_hour : 0;
+  if (hoursToSleep < 0)
   {
-    hoursUntilTomorrowMorning += 24;
+    hoursToSleep += 24;
   }
 
-  int minutesUntilNextHour = 59 - timeinfo.tm_min;
-  if (minutesUntilNextHour < 5)
+  int minutesToSleep = sleepDuration == SleepDuration::fiveMinutes ? 5 : 59 - timeinfo.tm_min;
+  if (minutesToSleep < 5)
   {
-    minutesUntilNextHour += 60;
+    minutesToSleep += 60;
   }
 
-  int secondsUntilNextMinute = 60 - timeinfo.tm_sec;
-  int secondsToSleep = (hoursUntilTomorrowMorning * 60 + minutesUntilNextHour) * 60 + secondsUntilNextMinute;
+  int secondsToSleep = 60 - timeinfo.tm_sec;
+  int sleepTime = (hoursToSleep * 60 + minutesToSleep) * 60 + secondsToSleep;
 
-  esp_sleep_enable_timer_wakeup(secondsToSleep * uS_TO_S_FACTOR);
-  log_d("Setup ESP32 to sleep for %d Seconds\n", secondsToSleep);
+  esp_sleep_enable_timer_wakeup(sleepTime * uS_TO_S_FACTOR);
+  log_d("Setup ESP32 to sleep for %d Seconds\n", sleepTime);
 
   esp_sleep_enable_ext1_wakeup(1 << GPIO_NUM_0, ESP_EXT1_WAKEUP_ANY_HIGH);
 
@@ -221,7 +239,7 @@ void connectToWifi(esp_sleep_wakeup_cause_t wakeup_reason, bool reset = false)
     }
 
     // now sleep for 1 hour then retry
-    sleepUntilNextHour(false);
+    enterDeepSleep(SleepDuration::untilNextHour);
   }
 }
 
@@ -261,7 +279,7 @@ int drawImg(JPEGDRAW *pDraw)
   return 1;
 }
 
-bool getJpeg(String url)
+bool getJpeg(String url, Battery status, bool useCache)
 {
   NetworkClientSecure client;
 
@@ -269,7 +287,14 @@ bool getJpeg(String url)
 
   HTTPClient http;
   http.addHeader("Authorization", prefs.getString("token"));
-  http.addHeader("If-None-Match", prefs.getString("ETag"));
+  if (useCache)
+  {
+    http.addHeader("If-None-Match", prefs.getString("ETag"));
+  }
+
+  http.addHeader("X-Battery-voltage", String(status.cellVoltage, 3));
+  http.addHeader("X-Battery-percent", String(status.cellPercent, 1));
+  http.addHeader("X-Battery-chargeRate", String(status.chargeRate, 1));
 
   const char *headerKeys[] = {"ETag"};
   const size_t headerKeysCount = sizeof(headerKeys) / sizeof(headerKeys[0]);
@@ -343,6 +368,31 @@ bool getJpeg(String url)
   }
 }
 
+Battery getBatteryStatus()
+{
+  float cellPercent = 0;
+  float cellVoltage = -1;
+  float chargeRate = 0;
+  if (maxlipo.begin())
+  {
+    delay(500);
+    cellPercent = maxlipo.cellPercent();
+    cellVoltage = maxlipo.cellVoltage();
+    chargeRate = maxlipo.chargeRate();
+
+    if (isnan(cellPercent) || isnan(cellVoltage) || isnan(chargeRate))
+    {
+      log_d("Failed to read cell voltage, check battery is connected!");
+      cellVoltage = -2;
+    }
+  }
+
+  return Battery{
+      cellPercent = cellPercent,
+      cellVoltage = cellVoltage,
+      chargeRate = chargeRate};
+}
+
 void setup()
 {
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -350,20 +400,16 @@ void setup()
   {
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, HIGH);
-    delay(500);
+    delay(250);
     digitalWrite(LED_BUILTIN, LOW);
-    delay(500);
+    delay(250);
     digitalWrite(LED_BUILTIN, HIGH);
-    delay(500);
+    delay(250);
     digitalWrite(LED_BUILTIN, LOW);
-    delay(500);
+    delay(250);
   }
 
   Serial.begin();
-
-  /////////TFT////////////
-
-  Serial.println("Started");
 
   ///////////// PREFS ////////////////
   prefs.begin("6-color-epd");
@@ -375,47 +421,34 @@ void setup()
 
   ////////////////////////////////////////
 
-  while (!maxlipo.begin())
-  {
-    Serial.println(F("Couldnt find Adafruit MAX17048?\nMake sure a battery is plugged in!"));
-    delay(2000);
-  }
-  Serial.print(F("Found MAX17048"));
-  Serial.print(F(" with Chip ID: 0x"));
-  Serial.println(maxlipo.getChipID(), HEX);
-
-  return;
-
   connectToWifi(wakeup_reason);
   setClock();
   doOTA();
 
-  if (getJpeg("https://6-color-epd.pages.dev/photo"))
+  Battery status = getBatteryStatus();
+
+  bool showBatteryStatus = wakeup_reason != ESP_SLEEP_WAKEUP_TIMER || status.isCharging();
+
+  if (getJpeg("https://6-color-epd.pages.dev/photo", status, !showBatteryStatus))
   {
+    if (showBatteryStatus)
+    {
+      gfx->setCursor(1, 1);
+      gfx->setFont();
+      gfx->setTextSize(2);
+      gfx->setTextColor(0b1111100000000000, 0xffff);
+      gfx->fillRect(0, 0, gfx->width(), 2 * 8 + 2, 0xffff);
+      gfx->printf("Battery: %.1f%% %.3fV (%.1f%%)", status.cellPercent, status.cellVoltage, status.chargeRate);
+    }
     gfx->dither();
     gfx->updateDisplay();
   }
 
-  sleepUntilNextHour();
+  enterDeepSleep(showBatteryStatus ? SleepDuration::fiveMinutes : SleepDuration::untilTomorrow);
 }
 
 void loop()
 {
-  float cellVoltage = maxlipo.cellVoltage();
-  if (isnan(cellVoltage))
-  {
-    Serial.println("Failed to read cell voltage, check battery is connected!");
-    delay(2000);
-    return;
-  }
-  Serial.print(F("Batt Voltage: "));
-  Serial.print(cellVoltage, 3);
-  Serial.println(" V");
-  Serial.print(F("Batt Percent: "));
-  Serial.print(maxlipo.cellPercent(), 1);
-  Serial.println(" %");
-  Serial.println();
-
   digitalWrite(LED_BUILTIN, HIGH);
   delay(500);
 
