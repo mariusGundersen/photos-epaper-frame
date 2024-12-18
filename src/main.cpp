@@ -150,8 +150,8 @@ void enterDeepSleep(SleepDuration sleepDuration)
   struct tm timeinfo;
   gmtime_r(&nowSecs, &timeinfo);
 
-  int hoursToSleep = sleepDuration == SleepDuration::untilTomorrow ? 6 - timeinfo.tm_hour : 0;
-  if (hoursToSleep < 0)
+  int hoursToSleep = sleepDuration == SleepDuration::untilTomorrow ? 3 - timeinfo.tm_hour : 0;
+  if (sleepDuration == SleepDuration::untilTomorrow && hoursToSleep < 1)
   {
     hoursToSleep += 24;
   }
