@@ -31,7 +31,11 @@ struct Battery
   float chargeRate = 0;
   bool isCharging()
   {
-    return chargeRate > 0.1 && cellVoltage < 4;
+    return chargeRate > 0.1f && cellVoltage < 4.1f;
+  }
+  bool needsCharging()
+  {
+    return cellVoltage < 3.5f;
   }
 };
 
@@ -168,7 +172,10 @@ void enterDeepSleep(SleepDuration sleepDuration)
   esp_sleep_enable_timer_wakeup(sleepTime * uS_TO_S_FACTOR);
   log_d("Setup ESP32 to sleep for %d Seconds\n", sleepTime);
 
-  esp_sleep_enable_ext1_wakeup(1 << GPIO_NUM_0, ESP_EXT1_WAKEUP_ANY_HIGH);
+  // This didn't work, need pull-up resistor
+  // pinMode(GPIO_NUM_0, INPUT_PULLUP);
+  // esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+  // esp_sleep_enable_ext1_wakeup(1 << GPIO_NUM_0, ESP_EXT1_WAKEUP_ANY_LOW);
 
   log_d("Going to sleep now\n");
   if (Serial)
@@ -420,14 +427,15 @@ void setup()
 
   ////////////////////////////////////////
 
-  if (status.cellVoltage < 3.5f)
+  if (status.needsCharging())
   {
     gfx->fillScreen(EPD_7IN3E_WHITE);
     gfx->setFont(&FreeSans24pt7b);
     gfx->setTextColor(EPD_7IN3E_RED);
     uint16_t y = gfx->printCentredText("Battery low!");
     gfx->setFont(&FreeSans12pt7b);
-    gfx->printCentredText("Please recharge me", y + 10);
+    y = gfx->printCentredText("Please recharge me", y + 10);
+    gfx->updateDisplay();
     enterDeepSleep(SleepDuration::untilTomorrow);
   }
 
@@ -452,8 +460,8 @@ void setup()
 
       if (status.isCharging())
       {
+        gfx->setTextSize(1);
         gfx->setFont(&FreeSans24pt7b);
-        gfx->setTextColor(EPD_7IN3E_BLACK);
         gfx->printCentredText("Charging...");
       }
     }

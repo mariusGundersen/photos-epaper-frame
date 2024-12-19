@@ -56,7 +56,7 @@ uint16_t Epaper::printCentredText(const char *buf, int x, int y, bool centerVert
     getTextBounds(buf, 0, 0, &x1, &y1, &w, &h); // calc width of new string
 
     x -= w / 2;
-    y -= (centerVertically ? h / 2 : 0) + (gfxFont ? h : 0);
+    y -= (centerVertically ? h / 2 : 0) - (gfxFont ? h : 0);
     setCursor(x, y);
     print(buf);
     return y + h;
