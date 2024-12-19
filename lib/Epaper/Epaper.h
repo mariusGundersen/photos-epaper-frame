@@ -18,8 +18,9 @@ public:
     void updateDisplay();
     void dither();
 
-    uint16_t printCentredText(const char *buf);
+    uint16_t printCentredText(const char *buf, bool centerVertically = true);
     uint16_t printCentredText(const char *buf, int x, int y, bool centerVertically = true);
+    uint16_t printCentredText(const char *buf, int y, bool centerVertically = true);
 };
 
 #endif

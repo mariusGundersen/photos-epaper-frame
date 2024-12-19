@@ -39,9 +39,14 @@ void Epaper::dither()
 #endif
 }
 
-uint16_t Epaper::printCentredText(const char *buf)
+uint16_t Epaper::printCentredText(const char *buf, bool centerVertically)
 {
-    return printCentredText(buf, _width / 2, _height / 2, true);
+    return printCentredText(buf, _width / 2, _height / 2, centerVertically);
+}
+
+uint16_t Epaper::printCentredText(const char *buf, int y, bool centerVertically)
+{
+    return printCentredText(buf, _width / 2, y, centerVertically);
 }
 
 uint16_t Epaper::printCentredText(const char *buf, int x, int y, bool centerVertically)
@@ -50,7 +55,9 @@ uint16_t Epaper::printCentredText(const char *buf, int x, int y, bool centerVert
     uint16_t w, h;
     getTextBounds(buf, 0, 0, &x1, &y1, &w, &h); // calc width of new string
 
-    setCursor(x - w / 2, y - (centerVertically ? h / 2 : 0) + (gfxFont ? h : 0));
+    x -= w / 2;
+    y -= (centerVertically ? h / 2 : 0) + (gfxFont ? h : 0);
+    setCursor(x, y);
     print(buf);
-    return h;
+    return y + h;
 }

@@ -31,7 +31,7 @@ struct Battery
   float chargeRate = 0;
   bool isCharging()
   {
-    return chargeRate > 0.01;
+    return chargeRate > 0.1 && cellVoltage < 4;
   }
 };
 
@@ -77,7 +77,7 @@ void goHereScreen()
   uint16_t qrcodeSize = qrcode.size * scale;
   uint16_t left = (gfx->width() - qrcodeSize) / 2;
   uint16_t top = (gfx->height() - qrcodeSize) / 2;
-  gfx->printCentredText("Go to this page", gfx->width() / 2, top / 2);
+  gfx->printCentredText("Go to this page", top / 2);
 
   for (uint8_t y = 0; y < qrcode.size; y++)
   {
@@ -93,7 +93,7 @@ void goHereScreen()
   }
 
   gfx->setFont(&FreeSans12pt7b);
-  uint16_t h = gfx->printCentredText(text.c_str(), gfx->width() / 2, top + qrcodeSize + 10, false);
+  gfx->printCentredText(text.c_str(), top + qrcodeSize + 10, false);
 
   gfx->updateDisplay();
 }
@@ -118,7 +118,7 @@ void wifiScreen(Epaper *gfx, const char *ssid, const char *password)
   uint16_t qrcodeSize = qrcode.size * scale;
   uint16_t left = (gfx->width() - qrcodeSize) / 2;
   uint16_t top = (gfx->height() - qrcodeSize) / 2;
-  gfx->printCentredText("Connect to WiFi", gfx->width() / 2, top / 2);
+  gfx->printCentredText("Connect to WiFi", top / 2);
 
   for (uint8_t y = 0; y < qrcode.size; y++)
   {
@@ -136,10 +136,10 @@ void wifiScreen(Epaper *gfx, const char *ssid, const char *password)
   gfx->setFont(&FreeSans12pt7b);
   char buffer[40];
   sprintf(buffer, "SSID: %s", ssid);
-  uint16_t h = gfx->printCentredText(buffer, gfx->width() / 2, top + qrcodeSize + 10, false);
-  h += 3; // some padding between the lines
+  uint16_t y = gfx->printCentredText(buffer, top + qrcodeSize + 10, false);
+  y += 3; // some padding between the lines
   sprintf(buffer, "Password: %s", password);
-  gfx->printCentredText(buffer, gfx->width() / 2, top + qrcodeSize + h + 10, false);
+  gfx->printCentredText(buffer, y, false);
 
   gfx->updateDisplay();
 }
@@ -250,21 +250,18 @@ void setClock()
   setenv("TZ", "CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00", 1);
   tzset();
 
-  Serial.print(F("Waiting for NTP time sync: "));
+  log_d("Waiting for NTP time sync: ");
   time_t nowSecs = time(nullptr);
   while (nowSecs < 8 * 3600 * 2)
   {
     delay(500);
-    Serial.print(F("."));
     yield();
     nowSecs = time(nullptr);
   }
 
-  Serial.println();
   struct tm timeinfo;
   gmtime_r(&nowSecs, &timeinfo);
-  Serial.print(F("Current time: "));
-  Serial.print(asctime(&timeinfo));
+  log_d("Current time: %s", asctime(&timeinfo));
 }
 
 JPEGDEC jpeg;
@@ -411,6 +408,8 @@ void setup()
 
   Serial.begin();
 
+  Battery status = getBatteryStatus();
+
   ///////////// PREFS ////////////////
   prefs.begin("6-color-epd");
 
@@ -421,11 +420,22 @@ void setup()
 
   ////////////////////////////////////////
 
+  if (status.cellVoltage < 3.5f)
+  {
+    gfx->fillScreen(EPD_7IN3E_WHITE);
+    gfx->setFont(&FreeSans24pt7b);
+    gfx->setTextColor(EPD_7IN3E_RED);
+    uint16_t y = gfx->printCentredText("Battery low!");
+    gfx->setFont(&FreeSans12pt7b);
+    gfx->printCentredText("Please recharge me", y + 10);
+    enterDeepSleep(SleepDuration::untilTomorrow);
+  }
+
+  ////////////////////////////////////////
+
   connectToWifi(wakeup_reason);
   setClock();
   doOTA();
-
-  Battery status = getBatteryStatus();
 
   bool showBatteryStatus = wakeup_reason != ESP_SLEEP_WAKEUP_TIMER || status.isCharging();
 
@@ -439,12 +449,20 @@ void setup()
       gfx->setTextColor(0b1111100000000000, 0xffff);
       gfx->fillRect(0, 0, gfx->width(), 2 * 8 + 2, 0xffff);
       gfx->printf("Battery: %.1f%% %.3fV (%.1f%%)", status.cellPercent, status.cellVoltage, status.chargeRate);
+
+      if (status.isCharging())
+      {
+        gfx->setFont(&FreeSans24pt7b);
+        gfx->setTextColor(EPD_7IN3E_BLACK);
+        gfx->printCentredText("Charging...");
+      }
     }
     gfx->dither();
     gfx->updateDisplay();
   }
 
-  enterDeepSleep(showBatteryStatus ? SleepDuration::fiveMinutes : SleepDuration::untilTomorrow);
+  enterDeepSleep(status.isCharging() ? SleepDuration::untilNextHour : showBatteryStatus ? SleepDuration::fiveMinutes
+                                                                                        : SleepDuration::untilTomorrow);
 }
 
 void loop()
