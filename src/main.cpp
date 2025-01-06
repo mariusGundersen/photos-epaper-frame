@@ -26,16 +26,16 @@ enum struct SleepDuration
 
 struct Battery
 {
-  float cellPercent = 0;
-  float cellVoltage = -1;
-  float chargeRate = 0;
+  float cellPercent = 0.0f;
+  float cellVoltage = -1.0f;
+  float chargeRate = 0.0f;
   bool isCharging()
   {
     return chargeRate > 0.1f && cellVoltage < 4.1f;
   }
   bool needsCharging()
   {
-    return cellVoltage < 3.5f && chargeRate < 0.1f;
+    return cellVoltage > 0.0f && cellVoltage < 3.5f && chargeRate < 0.1f;
   }
 };
 
@@ -299,6 +299,7 @@ bool getJpeg(String url, Battery status, bool useCache)
   http.addHeader("X-Battery-voltage", String(status.cellVoltage, 3));
   http.addHeader("X-Battery-percent", String(status.cellPercent, 1));
   http.addHeader("X-Battery-chargeRate", String(status.chargeRate, 1));
+  http.addHeader("X-Release-Version", String(RELEASE_VERSION));
 
   const char *headerKeys[] = {"ETag"};
   const size_t headerKeysCount = sizeof(headerKeys) / sizeof(headerKeys[0]);
@@ -377,7 +378,7 @@ bool getJpeg(String url, Battery status, bool useCache)
 Battery getBatteryStatus()
 {
   float cellPercent = 0;
-  float cellVoltage = -1;
+  float cellVoltage = 0;
   float chargeRate = 0;
   if (maxlipo.begin())
   {
@@ -389,9 +390,14 @@ Battery getBatteryStatus()
     if (isnan(cellPercent) || isnan(cellVoltage) || isnan(chargeRate))
     {
       log_d("Failed to read cell voltage, check battery is connected!");
-      cellVoltage = -2;
     }
   }
+  else
+  {
+    log_d("Could not connect to battery");
+  }
+
+  log_d("Battery voltage is %f, chargeRate is %f", cellVoltage, chargeRate);
 
   return Battery{
       cellPercent = cellPercent,
