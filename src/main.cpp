@@ -35,7 +35,7 @@ struct Battery
   }
   bool needsCharging()
   {
-    return cellVoltage < 3.5f;
+    return cellVoltage < 3.5f && chargeRate < 0.1f;
   }
 };
 
@@ -222,7 +222,7 @@ void connectToWifi(esp_sleep_wakeup_cause_t wakeup_reason, bool reset = false)
       gfx->fillScreen(EPD_7IN3E_WHITE);
       gfx->setFont(&FreeSans24pt7b);
       gfx->setTextColor(EPD_7IN3E_BLACK);
-      gfx->printCentredText("Connect to WiFi");
+      gfx->printCentredText("WiFi Connected");
       gfx->updateDisplay(); });
   }
 
@@ -316,6 +316,8 @@ bool getJpeg(String url, Battery status, bool useCache)
   else if (httpCode != HTTP_CODE_OK)
   {
     log_d("Failed to fetch the JPEG image, HTTP code: %d\n", httpCode);
+
+    // TODO: if the code is 302 or something else indicating wrong token, clear the wifi and token
 
     return false;
   }
