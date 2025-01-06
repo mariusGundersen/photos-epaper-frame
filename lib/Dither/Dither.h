@@ -64,6 +64,6 @@ class FloydSteinberg
 public:
     FloydSteinberg(uint8_t palette_size, RGB *palette);
     uint16_t find_closest_palette_color(uint16_t pixel);
-    uint16_t find_closest_palette_color(uint16_t pixel, int *errors, int evenOdd);
+    uint16_t find_closest_palette_color(uint16_t pixel, int evenOdd);
     void dither(const int w, const int h, uint16_t *pixels);
 };

@@ -1,10 +1,11 @@
 #include "Epaper.h"
 
-RGB palette[6] = {
+RGB palette[7] = {
     0x0000, // black
     0xFFFF, // white
     0xFFE0, // yellow
     0xF800, // red
+    0xFF80, // orange - unused
     0x001F, // blue
     0x07E0, // green
 };
@@ -12,7 +13,7 @@ RGB palette[6] = {
 Epaper::Epaper(uint8_t cs, uint8_t dc, uint8_t busy, uint8_t reset, uint16_t width, uint16_t height)
     : GFXcanvas16(width, height),
       _epd(EPD_7in3e(cs, dc, busy, reset)),
-      _dither(FloydSteinberg(6, palette))
+      _dither(FloydSteinberg(7, palette))
 {
 }
 
