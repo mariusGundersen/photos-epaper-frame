@@ -66,11 +66,6 @@ void FloydSteinberg::dither(const int w, const int h, uint16_t *pixels)
 
 */
 
-uint16_t FloydSteinberg::find_closest_palette_color(uint16_t pixel)
-{
-    return this->find_closest_palette_color(pixel, 0);
-}
-
 uint16_t FloydSteinberg::find_closest_palette_color(uint16_t pixel, int evenOdd)
 {
     RGB sample = RGB(pixel);
