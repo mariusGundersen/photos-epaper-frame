@@ -43,18 +43,12 @@ jobs:
       - name: Install PlatformIO libraries
         run: pio pkg install
 
-      - name: Build PlatformIO
-        run: platformio run -e release
-
       - id: release
         name: Create release
         uses: mgoltzsche/conventional-release@v0
         with:
           github-release-files: .pio/build/release/firmware.bin
           ignore-commits-before: 2eb3ca4f
-#
-#      - name: Release
-#        uses: softprops/action-gh-release@v2
-#        if: startsWith(github.ref, 'refs/tags/v')
-#        with:
-#          files: .pio/build/*/firmware.bin
+
+      - name: Build PlatformIO
+        run: platformio run -e release
