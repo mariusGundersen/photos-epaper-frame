@@ -6,23 +6,15 @@ FloydSteinberg::FloydSteinberg(uint8_t palette_size, RGB *palette)
     this->palette = palette;
 }
 
-void add_error(uint16_t *pixel, int errors[3], uint8_t q)
+void add_error(uint16_t *pixel, int r, int g, int b, uint8_t q)
 {
     RGB rgb = RGB(*pixel);
-    rgb.add_error(errors, q);
+    rgb.add_error(r, g, b, q);
     *pixel = rgb;
-}
-
-void get_errors(int *errors, RGB before, RGB after)
-{
-    errors[0] = before.r - after.r;
-    errors[1] = before.g - after.g;
-    errors[2] = before.b - after.b;
 }
 
 void FloydSteinberg::dither(const int w, const int h, uint16_t *pixels)
 {
-    int errors[3];
     int row = 0;
     for (int y = 0; y < h; y++, row += w)
     {
@@ -31,27 +23,30 @@ void FloydSteinberg::dither(const int w, const int h, uint16_t *pixels)
 
         for (int x = 0; x < w; x++)
         {
-            uint16_t oldpixel = pixels[row + x];
+            RGB oldpixel = pixels[row + x];
             uint16_t newpixel = this->find_closest_palette_color(oldpixel, y + x);
-            get_errors(errors, oldpixel, this->palette[newpixel]);
+            RGB after = this->palette[newpixel];
+            int r = oldpixel.r - after.r;
+            int g = oldpixel.g - after.g;
+            int b = oldpixel.b - after.b;
             pixels[row + x] = newpixel;
             if (x + 1 < w)
             {
-                add_error(&pixels[row + (x + 1)], errors, 7);
+                add_error(&pixels[row + (x + 1)], r, g, b, 7);
             }
 
             if (has_next_row)
             {
                 if (x - 1 >= 0)
                 {
-                    add_error(&pixels[next_row + (x - 1)], errors, 3);
+                    add_error(&pixels[next_row + (x - 1)], r, g, b, 3);
                 }
 
-                add_error(&pixels[next_row + (x + 0)], errors, 5);
+                add_error(&pixels[next_row + (x + 0)], r, g, b, 5);
 
                 if (x + 1 < w)
                 {
-                    add_error(&pixels[next_row + (x + 1)], errors, 1);
+                    add_error(&pixels[next_row + (x + 1)], r, g, b, 1);
                 }
             }
         }
@@ -97,63 +92,20 @@ uint16_t FloydSteinberg::find_closest_palette_color(uint16_t pixel, int evenOdd)
             }
             else
             {
-                // cyan, pick the highest of blue and green and white
-                uint8_t w = RGB_RED_FULL - r;
+                // cyan, pick the highest of blue and green
                 g = g >> 1;
 
                 if (g > b)
                 {
-                    if (w > g)
-                    {
-                        return 1; // white
-                    }
-                    else if (w == g)
-                    {
-                        return evenOdd & 1 ? 1 : 6; // white or green
-                    }
-                    else
-                    {
-                        return 6; // green
-                    }
+                    return 6; // green
                 }
                 else if (g == b)
                 {
-                    if (w > g)
-                    {
-                        return 1; // white;
-                    }
-                    else if (w == g)
-                    {
-                        switch (evenOdd % 3)
-                        {
-                        case 0:
-                            return 1; // white;
-                        case 1:
-                            return 5; // blue;
-                        case 2:
-                        default:
-                            return 6; // green;
-                        }
-                    }
-                    else
-                    {
-                        return evenOdd & 1 ? 5 : 6; // blue or green
-                    }
+                    return evenOdd & 1 ? 5 : 6; // blue or green
                 }
                 else
                 {
-                    if (w > b)
-                    {
-                        return 1; // white
-                    }
-                    else if (w == b)
-                    {
-                        return evenOdd & 1 ? 1 : 5; // white or blue
-                    }
-                    else
-                    {
-                        return 5; // blue
-                    }
+                    return 5; // blue
                 }
             }
         }
@@ -169,67 +121,20 @@ uint16_t FloydSteinberg::find_closest_palette_color(uint16_t pixel, int evenOdd)
             }
             else
             {
-                // magenta, pick the highest of red, blue and white
-
-                uint8_t w = (RGB_GREEN_FULL - g) >> 1;
+                // magenta, pick the highest of red and blue
 
                 if (r > b)
                 {
-                    if (r > w)
-                    {
-                        return 3; // red
-                    }
-                    else if (w == r)
-                    {
-                        return evenOdd & 1 ? 1 : 3; // white or red
-                    }
-                    else
-                    {
-                        return 1; // white
-                    }
+                    return 3; // red
                 }
                 else if (r == b)
                 {
-                    if (w > r)
-                    {
-                        return 1; // white;
-                    }
-                    else if (w == r)
-                    {
-                        switch (evenOdd % 3)
-                        {
-                        case 0:
-                            return 1; // white;
-                        case 1:
-                            return 5; // blue;
-                        case 2:
-                        default:
-                            return 3; // red;
-                        }
-                    }
-                    else
-                    {
-                        return evenOdd & 1 ? 5 : 3; // blue or red
-                    }
+                    return evenOdd & 1 ? 5 : 3; // blue or red
                 }
                 else
                 {
-                    if (b > w)
-                    {
-                        return 5; // blue
-                    }
-                    else if (w == b)
-                    {
-                        return evenOdd & 1 ? 1 : 5; // white or blue
-                    }
-                    else
-                    {
-                        return 1; // white
-                    }
+                    return 5; // blue
                 }
-
-                bool redish = (evenOdd & 1) ? r > b : r >= b;
-                return redish ? 3 : 5;
             }
         }
         else

@@ -54,6 +54,25 @@ struct RGB
         g = clamp(g + e[1] * q / 16, 0, RGB_GREEN_FULL);
         b = clamp(b + e[2] * q / 16, 0, RGB_BLUE_FULL);
     }
+
+    void add_error(int r, int g, int b, int q)
+    {
+        r = this->r + r * q / 16;
+        g = this->g + g * q / 16;
+        b = this->b + b * q / 16;
+
+        if (r > RGB_RED_FULL || g > RGB_GREEN_FULL || b > RGB_BLUE_FULL)
+        {
+            int m = max(r, max(g >> 1, b));
+            r = r * RGB_RED_FULL / m;
+            g = g * RGB_GREEN_FULL / (m << 1);
+            b = b * RGB_BLUE_FULL / m;
+        }
+
+        this->r = clamp(r, 0, RGB_RED_FULL);
+        this->g = clamp(g, 0, RGB_GREEN_FULL);
+        this->b = clamp(b, 0, RGB_BLUE_FULL);
+    }
 };
 
 class FloydSteinberg
