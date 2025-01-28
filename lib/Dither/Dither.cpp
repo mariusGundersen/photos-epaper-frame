@@ -22,11 +22,7 @@ void add_error(uint16_t *pixel, int r, int g, int b, uint8_t q)
         b = b * RGB_BLUE_FULL / m;
     }
 
-    rgb.r = clamp(r, 0, RGB_RED_FULL);
-    rgb.g = clamp(g, 0, RGB_GREEN_FULL);
-    rgb.b = clamp(b, 0, RGB_BLUE_FULL);
-
-    *pixel = rgb;
+    *pixel = RGB(r, g, b);
 }
 
 void FloydSteinberg::dither(const int w, const int h, uint16_t *pixels)

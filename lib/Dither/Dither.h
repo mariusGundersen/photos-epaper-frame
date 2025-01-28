@@ -28,24 +28,25 @@ int clamp(int value, int min, int max);
 
 struct RGB
 {
-    RGB(uint16_t pixel)
+    RGB(uint16_t pixel) : r((pixel >> 11)),
+                          g((pixel >> 5)),
+                          b((pixel >> 0))
     {
-        r = (pixel >> 11) & RGB_RED_FULL;
-        g = (pixel >> 5) & RGB_GREEN_FULL;
-        b = (pixel >> 0) & RGB_BLUE_FULL;
     }
-    RGB(uint8_t r, uint8_t g, uint8_t b)
+
+    RGB(uint8_t r, uint8_t g, uint8_t b) : r(r),
+                                           g(g),
+                                           b(b)
     {
-        this->r = clamp(r, 0, RGB_RED_FULL);
-        this->g = clamp(g, 0, RGB_GREEN_FULL);
-        this->b = clamp(b, 0, RGB_BLUE_FULL);
     }
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
+
+    const uint16_t r : 5;
+    const uint16_t g : 6;
+    const uint16_t b : 5;
+
     operator uint16_t() const
     {
-        return (uint16_t)(((r & RGB_RED_FULL) << 11) | ((g & RGB_GREEN_FULL) << 5) | (b & RGB_BLUE_FULL));
+        return (uint16_t)((r << 11) | (g << 5) | b);
     }
 };
 
