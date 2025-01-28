@@ -1,19 +1,9 @@
 #include "Epaper.h"
 
-RGB palette[7] = {
-    0x0000, // black
-    0xFFFF, // white
-    0xFFE0, // yellow
-    0xF800, // red
-    0xFF80, // orange - unused
-    0x001F, // blue
-    0x07E0, // green
-};
-
 Epaper::Epaper(uint8_t cs, uint8_t dc, uint8_t busy, uint8_t reset, uint16_t width, uint16_t height)
     : GFXcanvas16(width, height),
       _epd(EPD_7in3e(cs, dc, busy, reset)),
-      _dither(FloydSteinberg(7, palette))
+      _dither(FloydSteinberg())
 {
 }
 
@@ -24,7 +14,25 @@ void Epaper::updateDisplay()
     _epd.init();
     //_epd.clear(EPD_7IN3E_WHITE);
     _epd.draw(WIDTH, HEIGHT, [&](int x, int y)
-              { return getRawPixel(x, y); });
+              { 
+                switch(getRawPixel(x, y)){
+                    case RGB_BLACK:
+                        return 0;
+                    case RGB_WHITE:
+                        return 1;
+                    case RGB_YELLOW:
+                        return 2;
+                    case RGB_RED:
+                        return 3;
+                    case RGB_ORANGE:
+                        return 4;
+                    case RGB_BLUE:
+                        return 5;
+                    case RGB_GREEN:
+                        return 6;
+                    default: 
+                        return 0;
+                } });
     _epd.sleep();
 }
 

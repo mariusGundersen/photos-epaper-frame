@@ -26,6 +26,14 @@ int clamp(int value, int min, int max);
 #define RGB_GREEN_HALF 0b011111
 #define RGB_BLUE_HALF 0b01111
 
+#define RGB_BLACK 0x0000
+#define RGB_WHITE 0xFFFF
+#define RGB_YELLOW 0xFFE0
+#define RGB_RED 0xF800
+#define RGB_ORANGE 0xFF80
+#define RGB_BLUE 0x001F
+#define RGB_GREEN 0x07E0
+
 struct RGB
 {
     RGB(uint16_t pixel) : r((pixel >> 11)),
@@ -52,11 +60,8 @@ struct RGB
 
 class FloydSteinberg
 {
-    uint8_t palette_size;
-    RGB *palette;
 
 public:
-    FloydSteinberg(uint8_t palette_size, RGB *palette);
     uint16_t find_closest_palette_color(uint16_t pixel, int evenOdd);
     void dither(const int w, const int h, uint16_t *pixels);
 };

@@ -73,9 +73,9 @@ void goHereScreen()
 
   qrcode_initText(&qrcode, qrcodeData, 4, ECC_MEDIUM, text.c_str());
 
-  gfx->fillScreen(EPD_7IN3E_WHITE);
+  gfx->fillScreen(RGB_WHITE);
   gfx->setFont(&FreeSans24pt7b);
-  gfx->setTextColor(EPD_7IN3E_BLACK);
+  gfx->setTextColor(RGB_BLACK);
 
   uint8_t scale = 4;
   uint16_t qrcodeSize = qrcode.size * scale;
@@ -92,7 +92,7 @@ void goHereScreen()
           top + y * scale,
           scale,
           scale,
-          qrcode_getModule(&qrcode, x, y) ? EPD_7IN3E_BLACK : EPD_7IN3E_WHITE);
+          qrcode_getModule(&qrcode, x, y) ? RGB_BLACK : RGB_WHITE);
     }
   }
 
@@ -114,9 +114,9 @@ void wifiScreen(Epaper *gfx, const char *ssid, const char *password)
 
   qrcode_initText(&qrcode, qrcodeData, 4, ECC_MEDIUM, text.c_str());
 
-  gfx->fillScreen(EPD_7IN3E_WHITE);
+  gfx->fillScreen(RGB_WHITE);
   gfx->setFont(&FreeSans24pt7b);
-  gfx->setTextColor(EPD_7IN3E_BLACK);
+  gfx->setTextColor(RGB_BLACK);
 
   uint8_t scale = 4;
   uint16_t qrcodeSize = qrcode.size * scale;
@@ -133,7 +133,7 @@ void wifiScreen(Epaper *gfx, const char *ssid, const char *password)
           top + y * scale,
           scale,
           scale,
-          qrcode_getModule(&qrcode, x, y) ? EPD_7IN3E_BLACK : EPD_7IN3E_WHITE);
+          qrcode_getModule(&qrcode, x, y) ? RGB_BLACK : RGB_WHITE);
     }
   }
 
@@ -219,9 +219,9 @@ void connectToWifi(esp_sleep_wakeup_cause_t wakeup_reason, bool reset = false)
     wm.setSaveConfigCallback([&]()
                              {
                               prefs.putString("token", token.getValue());
-      gfx->fillScreen(EPD_7IN3E_WHITE);
+      gfx->fillScreen(RGB_WHITE);
       gfx->setFont(&FreeSans24pt7b);
-      gfx->setTextColor(EPD_7IN3E_BLACK);
+      gfx->setTextColor(RGB_BLACK);
       gfx->printCentredText("WiFi Connected");
       gfx->updateDisplay(); });
   }
@@ -235,9 +235,9 @@ void connectToWifi(esp_sleep_wakeup_cause_t wakeup_reason, bool reset = false)
     counter++;
     if (counter > 5 || wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
     {
-      gfx->fillScreen(EPD_7IN3E_WHITE);
+      gfx->fillScreen(RGB_WHITE);
       gfx->setFont(&FreeSans24pt7b);
-      gfx->setTextColor(EPD_7IN3E_BLACK);
+      gfx->setTextColor(RGB_BLACK);
       gfx->printCentredText("Press Reset button");
       gfx->updateDisplay();
 
@@ -437,9 +437,9 @@ void setup()
 
   if (status.needsCharging())
   {
-    gfx->fillScreen(EPD_7IN3E_WHITE);
+    gfx->fillScreen(RGB_WHITE);
     gfx->setFont(&FreeSans24pt7b);
-    gfx->setTextColor(EPD_7IN3E_RED);
+    gfx->setTextColor(RGB_RED);
     uint16_t y = gfx->printCentredText("Battery low!");
     gfx->setFont(&FreeSans12pt7b);
     y = gfx->printCentredText("Please recharge me", y + 10);
@@ -457,13 +457,14 @@ void setup()
 
   if (getJpeg("https://6-color-epd.pages.dev/photo", status, !showBatteryStatus))
   {
+    gfx->dither();
     if (showBatteryStatus)
     {
       gfx->setCursor(1, 1);
       gfx->setFont();
       gfx->setTextSize(2);
-      gfx->setTextColor(0b1111100000000000, 0xffff);
-      gfx->fillRect(0, 0, gfx->width(), 2 * 8 + 2, 0xffff);
+      gfx->setTextColor(RGB_RED, RGB_WHITE);
+      gfx->fillRect(0, 0, gfx->width(), 2 * 8 + 2, RGB_WHITE);
       gfx->printf("Battery: %.1f%% %.3fV (%.1f%%)", status.cellPercent, status.cellVoltage, status.chargeRate);
 
       if (status.isCharging())
@@ -473,7 +474,6 @@ void setup()
         gfx->printCentredText("Charging...");
       }
     }
-    gfx->dither();
     gfx->updateDisplay();
   }
 
