@@ -9,7 +9,23 @@ FloydSteinberg::FloydSteinberg(uint8_t palette_size, RGB *palette)
 void add_error(uint16_t *pixel, int r, int g, int b, uint8_t q)
 {
     RGB rgb = RGB(*pixel);
-    rgb.add_error(r, g, b, q);
+
+    r = rgb.r + r * q / 16;
+    g = rgb.g + g * q / 16;
+    b = rgb.b + b * q / 16;
+
+    if (r > RGB_RED_FULL || g > RGB_GREEN_FULL || b > RGB_BLUE_FULL)
+    {
+        int m = max(r, max(g >> 1, b));
+        r = r * RGB_RED_FULL / m;
+        g = g * RGB_GREEN_FULL / (m << 1);
+        b = b * RGB_BLUE_FULL / m;
+    }
+
+    rgb.r = clamp(r, 0, RGB_RED_FULL);
+    rgb.g = clamp(g, 0, RGB_GREEN_FULL);
+    rgb.b = clamp(b, 0, RGB_BLUE_FULL);
+
     *pixel = rgb;
 }
 
