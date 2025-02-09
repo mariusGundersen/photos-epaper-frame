@@ -243,10 +243,11 @@ void connectToWifi(esp_sleep_wakeup_cause_t wakeup_reason, bool reset = false)
 
       // make sure it refreshes the screen when it reconnects
       prefs.remove("ETag");
+      enterDeepSleep(SleepDuration::untilTomorrow);
+    } else {
+      // now sleep for 1 hour then retry
+      enterDeepSleep(SleepDuration::untilNextHour);
     }
-
-    // now sleep for 1 hour then retry
-    enterDeepSleep(SleepDuration::untilNextHour);
   }
 }
 
