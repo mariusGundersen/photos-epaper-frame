@@ -1,12 +1,14 @@
 #include "Dither.h"
 
+#define COLOR_ADJUST 20
+
 void add_error(uint16_t *pixel, int r, int g, int b, uint8_t q)
 {
     RGB rgb = RGB(*pixel);
 
-    r = rgb.r + r * q / 16;
-    g = rgb.g + g * q / 16;
-    b = rgb.b + b * q / 16;
+    r = rgb.r + r * q / COLOR_ADJUST;
+    g = rgb.g + g * q / COLOR_ADJUST;
+    b = rgb.b + b * q / COLOR_ADJUST;
 
     if (r > RGB_RED_FULL || g > RGB_GREEN_FULL || b > RGB_BLUE_FULL)
     {
