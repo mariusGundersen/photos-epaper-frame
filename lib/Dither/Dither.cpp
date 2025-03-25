@@ -1,6 +1,6 @@
 #include "Dither.h"
 
-#define COLOR_ADJUST 20
+#define COLOR_ADJUST 24
 
 void add_error(uint16_t *pixel, int r, int g, int b, uint8_t q)
 {
