@@ -35,13 +35,11 @@ void FloydSteinberg::dither(const int w, const int h, uint16_t *pixels)
             int g = oldpixel.g - newpixel.g;
             int b = oldpixel.b - newpixel.b;
             pixels[row + x] = newpixel;
-            if (x + 1 < w)
-            {
-                add_error(&pixels[row + (x + 1)], r, g, b, 7);
-            }
 
             if (has_next_row)
             {
+                add_error(&pixels[row + (x + 1)], r, g, b, 7);
+
                 if (x - 1 >= 0)
                 {
                     add_error(&pixels[next_row + (x - 1)], r, g, b, 3);
@@ -53,6 +51,10 @@ void FloydSteinberg::dither(const int w, const int h, uint16_t *pixels)
                 {
                     add_error(&pixels[next_row + (x + 1)], r, g, b, 1);
                 }
+            }
+            else if (x + 1 < w)
+            {
+                add_error(&pixels[row + (x + 1)], r, g, b, 7);
             }
         }
     }
