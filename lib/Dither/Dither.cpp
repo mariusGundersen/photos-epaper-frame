@@ -10,13 +10,13 @@ void add_error(uint16_t *pixel, int r, int g, int b, uint8_t q)
     g = rgb.g + g * q / COLOR_ADJUST;
     b = rgb.b + b * q / COLOR_ADJUST;
 
-    if (r > RGB_RED_FULL || g > RGB_GREEN_FULL || b > RGB_BLUE_FULL)
+    /*if (r > RGB_RED_FULL || g > RGB_GREEN_FULL || b > RGB_BLUE_FULL)
     {
         int m = max(r, max(g >> 1, b));
         r = r * RGB_RED_FULL / m;
         g = g * RGB_GREEN_FULL / (m << 1);
         b = b * RGB_BLUE_FULL / m;
-    }
+    }*/
 
     *pixel = RGB(r, g, b);
 }
