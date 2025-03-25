@@ -2,13 +2,22 @@
 
 #define COLOR_ADJUST 24
 
+static int div_round(int a, int b)
+{
+    return a < 0 ? (a - b / 2) / b : (a + b / 2) / b;
+}
+
 void add_error(uint16_t *pixel, int r, int g, int b, uint8_t q)
 {
     RGB rgb = RGB(*pixel);
 
-    r = rgb.r + r * q / COLOR_ADJUST;
-    g = rgb.g + g * q / COLOR_ADJUST;
-    b = rgb.b + b * q / COLOR_ADJUST;
+    r *= q;
+    g *= q;
+    b *= q;
+
+    r = rgb.r + div_round(r, COLOR_ADJUST);
+    g = rgb.g + div_round(g, COLOR_ADJUST);
+    b = rgb.b + div_round(b, COLOR_ADJUST);
 
     /*if (r > RGB_RED_FULL || g > RGB_GREEN_FULL || b > RGB_BLUE_FULL)
     {
