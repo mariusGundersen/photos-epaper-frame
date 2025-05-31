@@ -178,8 +178,8 @@ void enterDeepSleep(SleepDuration sleepDuration)
   // esp_sleep_enable_ext1_wakeup(1 << GPIO_NUM_0, ESP_EXT1_WAKEUP_ANY_LOW);
 
   log_d("Going to sleep now\n");
-  if (Serial)
-    Serial.flush();
+  // if (Serial)
+  // Serial.flush();
 
   esp_deep_sleep_start();
 }
@@ -244,7 +244,9 @@ void connectToWifi(esp_sleep_wakeup_cause_t wakeup_reason, bool reset = false)
       // make sure it refreshes the screen when it reconnects
       prefs.remove("ETag");
       enterDeepSleep(SleepDuration::untilTomorrow);
-    } else {
+    }
+    else
+    {
       // now sleep for 1 hour then retry
       enterDeepSleep(SleepDuration::untilNextHour);
     }
@@ -260,7 +262,7 @@ void setClock()
 
   log_d("Waiting for NTP time sync: ");
   time_t nowSecs = time(nullptr);
-  while (nowSecs < 8 * 3600 * 2)
+  while (nowSecs < 10)
   {
     delay(500);
     yield();
@@ -409,8 +411,10 @@ Battery getBatteryStatus()
 void setup()
 {
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  bool reset = false;
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
+    pinMode(GPIO_NUM_0, INPUT_PULLUP);
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, HIGH);
     delay(250);
@@ -420,9 +424,12 @@ void setup()
     delay(250);
     digitalWrite(LED_BUILTIN, LOW);
     delay(250);
+    reset = !digitalRead(GPIO_NUM_0);
   }
 
   Serial.begin();
+  log_d("pin 0: %d", digitalRead(GPIO_NUM_0));
+  log_d("reset: %d", reset);
 
   Battery status = getBatteryStatus();
 
@@ -450,7 +457,7 @@ void setup()
 
   ////////////////////////////////////////
 
-  connectToWifi(wakeup_reason);
+  connectToWifi(wakeup_reason, reset);
   setClock();
   doOTA();
 
@@ -465,8 +472,14 @@ void setup()
       gfx->setFont();
       gfx->setTextSize(2);
       gfx->setTextColor(RGB_RED, RGB_WHITE);
-      gfx->fillRect(0, 0, gfx->width(), 2 * 8 + 2, RGB_WHITE);
+      gfx->fillRect(0, 0, gfx->width(), 4 * 8 + 3, RGB_WHITE);
       gfx->printf("Battery: %.1f%% %.3fV (%.1f%%)", status.cellPercent, status.cellVoltage, status.chargeRate);
+
+      time_t nowSecs = time(nullptr);
+      struct tm timeinfo;
+      gmtime_r(&nowSecs, &timeinfo);
+      gfx->setCursor(1, 2 * 8 + 2);
+      gfx->print(asctime(&timeinfo));
 
       if (status.isCharging())
       {
